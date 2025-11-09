@@ -24,4 +24,4 @@ After you complete this exercise, you will be able to:
 
 ## Lab Duration
 
-* **Estimated Time:** 180 minutes
+* **Estimated Time:** 25 minutes
