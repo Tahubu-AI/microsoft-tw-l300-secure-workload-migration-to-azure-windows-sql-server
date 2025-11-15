@@ -3,9 +3,6 @@
 // param resourceNameBase string = 'tailspin${take(uniqueString(resourceGroup().id), 7)}'
 var resourceNameBase = 'tailspin${take(uniqueString(resourceGroup().id), 7)}'
 
-@description('The location were all resources are created.')
-param deploymentLocation string = 'northcentralus'
-
 @description('The Id of the Azure AD User.')
 param azureAdUserId string
 @description('The Login of the Azure AD User (ex: username@domain.onmicrosoft.com).')
@@ -37,7 +34,7 @@ param sqlmiSku string = 'GP_Gen5'
 ])
 param sqlmiVCores int = 8
 
-var location = deploymentLocation
+var location = resourceGroup().location
 
 var onpremNamePrefix = '${resourceNameBase}-onprem-'
 var hubNamePrefix = '${resourceNameBase}-hub-'
