@@ -9,13 +9,6 @@
     }
   },
   "parameters": {
-    "deploymentLocation": {
-      "type": "string",
-      "defaultValue": "usgovvirginia",
-      "metadata": {
-        "description": "The location were all resources are created."
-      }
-    },
     "azureAdUserId": {
       "type": "string",
       "metadata": {
@@ -70,7 +63,7 @@
   },
   "variables": {
     "resourceNameBase": "[format('tailspin{0}', take(uniqueString(resourceGroup().id), 7))]",
-    "location": "[parameters('deploymentLocation')]",
+    "location": "[resourceGroup().location]",
     "onpremNamePrefix": "[format('{0}-onprem-', variables('resourceNameBase'))]",
     "hubNamePrefix": "[format('{0}-hub-', variables('resourceNameBase'))]",
     "spokeNamePrefix": "[format('{0}-spoke-', variables('resourceNameBase'))]",
