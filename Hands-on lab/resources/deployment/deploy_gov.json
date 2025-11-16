@@ -4,8 +4,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.31.92.45157",
-      "templateHash": "9210324150764881740"
+      "version": "0.32.4.45862",
+      "templateHash": "3092039172553261923"
     }
   },
   "parameters": {
@@ -23,10 +23,10 @@
     },
     "onpremVMSize": {
       "type": "string",
-      "defaultValue": "Standard_D4s_v5",
+      "defaultValue": "Standard_D4s_v4",
       "allowedValues": [
-        "Standard_D4s_v5",
         "Standard_D4s_v4",
+        "Standard_D4s_v5",
         "Standard_D4as_v5",
         "Standard_D4_v5",
         "Standard_D4a_v4",
@@ -69,25 +69,21 @@
     "spokeNamePrefix": "[format('{0}-spoke-', variables('resourceNameBase'))]",
     "sqlmiPrefix": "[format('{0}-sqlmi', variables('resourceNameBase'))]",
     "sqlmiStorageName": "[format('{0}sqlmistor', variables('resourceNameBase'))]",
-    "onpremSQLVMNamePrefix": "[format('{0}sql-', variables('onpremNamePrefix'))]",
     "onpremHyperVHostVMNamePrefix": "[format('{0}hyperv-', variables('onpremNamePrefix'))]",
-    "GitHubScriptRepo": "microsoft/TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure",
+    "GitHubScriptRepo": "Tahubu-AI/microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server",
     "GitHubScriptRepoBranch": "main",
     "GitHubScriptRepoBranchURL": "[format('https://raw.githubusercontent.com/{0}/{1}/Hands-on lab/resources/deployment/', variables('GitHubScriptRepo'), variables('GitHubScriptRepoBranch'))]",
-    "HyperVHostConfigArchiveFileName": "create-vm.zip",
-    "HyperVHostConfigArchiveScriptName": "create-vm.ps1",
+    "HyperVHostConfigArchiveFileName": "create-guest-vms.zip",
+    "HyperVHostGuestVmsScriptName": "create-guest-vms.ps1",
     "HyperVHostConfigURL": "[format('{0}onprem/{1}', variables('GitHubScriptRepoBranchURL'), variables('HyperVHostConfigArchiveFileName'))]",
     "HyperVHostInstallHyperVScriptFolder": ".",
     "HyperVHostInstallHyperVScriptFileName": "install-hyper-v.ps1",
     "HyperVHostInstallHyperVURL": "[format('{0}onprem/{1}', variables('GitHubScriptRepoBranchURL'), variables('HyperVHostInstallHyperVScriptFileName'))]",
-    "SQLVMConfigFileName": "sql-vm-config.zip",
-    "SQLVMConfigScriptName": "sql-vm-config.ps1",
-    "SQLVMConfigURL": "[format('{0}onprem/{1}', variables('GitHubScriptRepoBranchURL'), variables('SQLVMConfigFileName'))]",
     "labUsername": "demouser",
     "labPassword": "demo!pass123",
     "labSqlMIPassword": "demo!pass1234567",
     "tags": {
-      "purpose": "techexcel"
+      "purpose": "tech-workshop"
     }
   },
   "resources": [
@@ -497,6 +493,48 @@
             "name": "Microsoft.Sql-managedInstances_UseOnly_mi-AzureActiveDirectory",
             "properties": {
               "addressPrefix": "AzureActiveDirectory",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-AzureCloud.northcentralus",
+            "properties": {
+              "addressPrefix": "AzureCloud.northcentralus",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-AzureCloud.southcentralus",
+            "properties": {
+              "addressPrefix": "AzureCloud.southcentralus",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-Storage.northcentralus",
+            "properties": {
+              "addressPrefix": "Storage.northcentralus",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-Storage.southcentralus",
+            "properties": {
+              "addressPrefix": "Storage.southcentralus",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-EventHub.northcentralus",
+            "properties": {
+              "addressPrefix": "EventHub.northcentralus",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-EventHub.southcentralus",
+            "properties": {
+              "addressPrefix": "EventHub.southcentralus",
               "nextHopType": "Internet"
             }
           }
@@ -1007,7 +1045,7 @@
     {
       "type": "Microsoft.Compute/virtualMachines/extensions",
       "apiVersion": "2017-12-01",
-      "name": "[format('{0}/{1}', format('{0}vm', variables('onpremHyperVHostVMNamePrefix')), 'CreateWinServerVM')]",
+      "name": "[format('{0}/{1}', format('{0}vm', variables('onpremHyperVHostVMNamePrefix')), 'CreateGuestVMs')]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
       "properties": {
@@ -1018,7 +1056,7 @@
         "settings": {
           "configuration": {
             "url": "[variables('HyperVHostConfigURL')]",
-            "script": "[variables('HyperVHostConfigArchiveScriptName')]",
+            "script": "[variables('HyperVHostGuestVmsScriptName')]",
             "function": "Main"
           }
         }
@@ -1026,118 +1064,6 @@
       "dependsOn": [
         "[resourceId('Microsoft.Compute/virtualMachines', format('{0}vm', variables('onpremHyperVHostVMNamePrefix')))]",
         "[resourceId('Microsoft.Compute/virtualMachines/extensions', format('{0}vm', variables('onpremHyperVHostVMNamePrefix')), 'InstallHyperV')]"
-      ]
-    },
-    {
-      "type": "Microsoft.Network/networkInterfaces",
-      "apiVersion": "2021-03-01",
-      "name": "[format('{0}nic', variables('onpremSQLVMNamePrefix'))]",
-      "location": "[variables('location')]",
-      "tags": "[variables('tags')]",
-      "properties": {
-        "ipConfigurations": [
-          {
-            "name": "ipconfig1",
-            "properties": {
-              "subnet": {
-                "id": "[format('{0}/subnets/default', resourceId('Microsoft.Network/virtualNetworks', format('{0}vnet', variables('onpremNamePrefix'))))]"
-              },
-              "privateIPAllocationMethod": "Dynamic"
-            }
-          }
-        ],
-        "networkSecurityGroup": {
-          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}nsg', variables('onpremSQLVMNamePrefix')))]"
-        }
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}nsg', variables('onpremSQLVMNamePrefix')))]",
-        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}vnet', variables('onpremNamePrefix')))]"
-      ]
-    },
-    {
-      "type": "Microsoft.Network/networkSecurityGroups",
-      "apiVersion": "2019-02-01",
-      "name": "[format('{0}nsg', variables('onpremSQLVMNamePrefix'))]",
-      "location": "[variables('location')]",
-      "tags": "[variables('tags')]",
-      "properties": {
-        "securityRules": [
-          {
-            "name": "RDP",
-            "properties": {
-              "protocol": "TCP",
-              "sourcePortRange": "*",
-              "destinationPortRange": "3389",
-              "sourceAddressPrefix": "*",
-              "destinationAddressPrefix": "*",
-              "access": "Allow",
-              "priority": 100,
-              "direction": "Inbound"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "type": "Microsoft.Compute/virtualMachines",
-      "apiVersion": "2021-07-01",
-      "name": "[format('{0}vm', variables('onpremSQLVMNamePrefix'))]",
-      "location": "[variables('location')]",
-      "tags": "[variables('tags')]",
-      "properties": {
-        "hardwareProfile": {
-          "vmSize": "[parameters('onpremVMSize')]"
-        },
-        "storageProfile": {
-          "osDisk": {
-            "createOption": "fromImage"
-          },
-          "imageReference": {
-            "publisher": "MicrosoftSQLServer",
-            "offer": "SQL2019-WS2022",
-            "sku": "Standard",
-            "version": "latest"
-          }
-        },
-        "networkProfile": {
-          "networkInterfaces": [
-            {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}nic', variables('onpremSQLVMNamePrefix')))]"
-            }
-          ]
-        },
-        "osProfile": {
-          "computerName": "SQLServer",
-          "adminUsername": "[variables('labUsername')]",
-          "adminPassword": "[variables('labPassword')]"
-        }
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Network/networkInterfaces', format('{0}nic', variables('onpremSQLVMNamePrefix')))]"
-      ]
-    },
-    {
-      "type": "Microsoft.Compute/virtualMachines/extensions",
-      "apiVersion": "2017-12-01",
-      "name": "[format('{0}/{1}', format('{0}vm', variables('onpremSQLVMNamePrefix')), 'SQLVMConfig')]",
-      "location": "[variables('location')]",
-      "tags": "[variables('tags')]",
-      "properties": {
-        "publisher": "Microsoft.Powershell",
-        "type": "DSC",
-        "typeHandlerVersion": "2.9",
-        "autoUpgradeMinorVersion": true,
-        "settings": {
-          "configuration": {
-            "url": "[variables('SQLVMConfigURL')]",
-            "script": "[variables('SQLVMConfigScriptName')]",
-            "function": "Main"
-          }
-        }
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Compute/virtualMachines', format('{0}vm', variables('onpremSQLVMNamePrefix')))]"
       ]
     }
   ]

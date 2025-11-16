@@ -1,5 +1,5 @@
 ---
-title: 'Exercise 01: SQL database migration'
+title: 'Exercise 01: SQL Migration to Azure via Arc MI-Link'
 layout: default
 nav_order: 3
 has_children: true
@@ -9,21 +9,20 @@ has_children: true
 
 ## Lab Scenario
 
-Tailspin Toys need to migrate their on-premises SQL Server database to Azure SQL Managed Instance. This is part of the migration strategy defined to migrate Tailspin Toys workloads to Azure.
+Tailspin Toys depends on mission-critical analytics and order systems that must never go down. To accommodate this requirement, they want to securely and efficiently migrate their SQL Server workloads to Azure, ensuring business continuity and meeting demanding recovery targets.
 
-In this exercise, you will go through the steps necessary to migrate Tailspin Toys' on-premises SQL Server database to Azure SQL Managed Instance.
-
-> **Note**: Since Azure SQL Manage Instance can take up to 4 hours to provision, the ARM Template deployment in the Before the Hands-on Lab deployment has already created the Azure SQL Managed Instance resource for this lab.
+In this exercise, you will migrate Tailspin's on-premises SQL Server database to Azure SQL Managed Instance via Azure Arc MI-Link.
 
 ## Objectives
 
 After you complete this lab, you will be able to:
 
-* Install Data Migration Assistant & Azure Data Studio
-* Assess on-premises database compatibility
-* Backup on-premises SQL database
-* Migrate database to Azure SQL MI
+- Arc-enable and connect an on-premises SQL Server instance to Azure
+- Implement MI-Link for hybrid replication and failover
+- Execute rollback and failback strategies
+- Upgrade to the latest compatible SQL Server and configure HA/DR
+- Enable advanced capabilities for modern data workloads
 
 ## Lab Duration
 
-* **Estimated Time:** 75 minutes
+- **Estimated Time:** 75 minutes
