@@ -114,7 +114,10 @@ Configuration Main
                                 $sourceUrl = "https://jumpstartprodsg.blob.core.windows.net/scenarios/prod"
                                 $vhdImageToDownload = "JSSQLStd19Base.vhdx"
                                 $vhdImageUrl = "$sourceUrl/$vhdImageToDownload"
-                                azcopy cp $vhdImageUrl $sqlVmVhdPath --recursive=true --check-length=false --log-level=ERROR
+                                
+                                $azcopyExe = "C:\ProgramData\chocolatey\bin\azcopy.exe"
+                                & $azcopyExe cp $vhdImageUrl $sqlVmVhdPath --recursive=true --check-length=false --log-level=ERROR
+
 
                                 # Create the SQL Server Guest VM
                                 New-VM -Name $sqlVMName `
