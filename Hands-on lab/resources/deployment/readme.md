@@ -4,9 +4,9 @@ This folder contains the setup deployment scripts for creating the required Azur
 
 Select the appropriate "Deploy" button below to provision the simulated on-premises Tailspin Toys resources for the lab into your Azure Subscription:
 
-[![Deploy To Azure](../../images/deploytoazure.svg "Deploy To Azure")](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2FTechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure%2Fmain%2FHands-on%2520lab%2Fresources%2Fdeployment%2Fdeploy.json)
+[![Deploy To Azure](../../images/deploytoazure.svg)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FTahubu-AI%2Fmicrosoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server%2Fmain%2FHands-on%2520lab%2Fresources%2Fdeployment%2Fdeploy.json)
 
-[![Deploy To Azure US Gov](../../images/deploytoazuregov.svg "Deploy to Azure Gov")](https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2FTechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure%2Fmain%2FHands-on%2520lab%2Fresources%2Fdeployment%2Fdeploy_gov.json)
+[![Deploy To Azure US Gov](../../images/deploytoazuregov.svg)](https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FTahubu-AI%2Fmicrosoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server%2Fmain%2FHands-on%2520lab%2Fresources%2Fdeployment%2Fdeploy.json)
 
 The ARM template will deploy the following resources:
 
@@ -14,9 +14,12 @@ The ARM template will deploy the following resources:
   - Hub and spoke network in Azure
   - Simulated on-premises network in Azure
 - Simulated on-premises environment
-  - Azure Virtual Machine with Hyper-V hosting a simulated on-premises Windows server machine
-  - Azure Virtual Machine hosting SQL Server to simulate an on-premises SQL database server
+  - Azure Virtual Machine with Hyper-V hosting two VMs:
+    - a simulated on-premises Windows server machine
+    - a simulated on-premises SQL Server machine
 - Azure Bastion to enable secure Remote Desktop connections to Virtual Machines
+- Azure SQL Managed Instance
+- Azure Storage Account for SQL Managed Instance backups
 
 ## Notes
 

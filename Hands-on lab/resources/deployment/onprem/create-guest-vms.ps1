@@ -11,26 +11,22 @@
  - Issues a Start Command for the new "OnPremVM"
 #>
 
-Configuration Main
-{
-	Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
+Configuration Main {
+        param (
+                [string]$repoOwner,
+                [string]$repoName
+        )
 
-	node "localhost"
-  	{
+        Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
+
+	node "localhost" {
 		Script ConfigureHyperVGuestVMs
     	        {
-			GetScript = 
-			{
-				@{Result = "ConfigureHyperVGuestVMs"}
-			}
-		
-			TestScript = 
-			{
-           		        return $false
-        	        }	
-		
-			SetScript =
-			{
+			TestScript =  { return $false }
+                        GetScript =  { @{Result = "ConfigureHyperVGuestVMs"} }
+			SetScript = {
+                                Write-Host "Repository Owner: $using:repoOwner"
+                                Write-Host "Repository Name: $using:repoName"
                                 # Install and configure DHCP service (used by Hyper-V nested VMs)
                                 $dnsClient = Get-DnsClient | Where-Object {$_.InterfaceAlias -eq "Ethernet" }
                                 $dhcpScope = Get-DhcpServerv4Scope
@@ -72,13 +68,13 @@ Configuration Main
                                 Set-Location $cloneDir
 
                                 git lfs install --skip-smudge
-                                git clone --quiet --single-branch "https://github.com/microsoft/TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure.git"
-                                Set-Location "$cloneDir\TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure\"
+                                git clone --quiet --single-branch "https://github.com/$using:repoOwner/$using:repoName.git"
+                                Set-Location "$cloneDir\$using:repoName\"
                                 git pull
                                 git lfs pull
                                 git lfs install --force
 
-                                $downloadedFile = "$cloneDir\TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
+                                $downloadedFile = "$cloneDir\$using:repoName\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
                                 
                                 $vmFolder = "C:\VM"
 
@@ -115,6 +111,7 @@ Configuration Main
                                 $sourceUrl = "https://jumpstartprodsg.blob.core.windows.net/scenarios/prod/$vhdImageToDownload"
                                 $destinationPath = "$sqlVmVhdPath\$vhdImageToDownload"
 
+                                # Download the SQL Server VHD image
                                 Invoke-WebRequest -Uri $sourceUrl -OutFile $destinationPath
 
                                 # Create the SQL Server Guest VM
@@ -128,8 +125,34 @@ Configuration Main
 
                                 Start-VM -Name $sqlVMName
 
-                                $sqlConfigFile = "C:\git\TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure\Hands-on lab\resources\deployment\onprem\sql-vm-config.ps1"
-                                Invoke-Command -VMName $sqlVMName -ScriptBlock { powershell -File $using:sqlConfigFile } -Credential $winCreds
+                                # Wait until the VM is running
+                                while ((Get-VM -Name $sqlVMName).State -ne 'Running') {
+                                        Start-Sleep -Seconds 10
+                                }
+
+                                $sqlConfigFileName = "sql-vm-config.ps1"
+                                $sqlConfigFile = "$cloneDir\$using:repoName\Hands-on lab\resources\deployment\onprem\$sqlConfigFileName"
+
+                                # Create a PowerShell Direct session into the SQL VM
+                                $session = New-PSSession -VMName $sqlVMName -Credential $winCreds
+
+                                # Ensure destination folder exists inside the VM
+                                Invoke-Command -Session $session -ScriptBlock {
+                                New-Item -ItemType Directory -Path "C:\scripts" -Force | Out-Null
+                                }
+
+                                # Copy the config script from host into the guest VM
+                                Copy-Item -Path $sqlConfigFile -Destination "C:\scripts\sql-vm-config.ps1" -ToSession $session
+
+                                # Run the config script inside the SQL VM
+                                Invoke-Command -Session $session -ScriptBlock {
+                                        powershell -ExecutionPolicy Bypass -File "C:\scripts\sql-vm-config.ps1" `
+                                                -repoOwner $using:repoOwner `
+                                                -repoName $using:repoName
+                                }
+
+                                # Clean up session
+                                Remove-PSSession $session
 			}
 		}	
   	}
