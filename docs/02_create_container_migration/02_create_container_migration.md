@@ -9,7 +9,7 @@ has_children: true
 
 ## Lab Scenario
 
-In this lab, attendees will perform steps toward migrating TailSpin containerized workloads to Azure Kubernetes Services (AKS) using the Container Migration Solution Accelerator. TailSpin needs to prepare its environment, deploy the accelerator, migrate workloads, configure post-migration settings, and validate business outcomes.  
+In this lab, you will perform steps toward migrating TailSpin Toys containerized workloads to Azure Kubernetes Services (AKS) using the Container Migration Solution Accelerator. TailSpin Toys needs to prepare its environment, deploy the accelerator, migrate workloads, configure post-migration settings, and validate business outcomes.  
 
 ## Objectives
 
