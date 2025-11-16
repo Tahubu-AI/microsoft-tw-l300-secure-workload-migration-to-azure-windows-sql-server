@@ -1,5 +1,8 @@
-<# 
- What does this script do?  
+<#
+.File Name
+ - create-guest-vms.ps1
+
+.What does this script do?
  - Creates an Internal Switch in Hyper-V called "NAT Switch"
  - Downloads an Image of Windows Server 2022 Datacenter to the local drive
  - Add a new IP address to the Internal Network for Hyper-V attached to the NAT Switch
@@ -29,7 +32,6 @@ Configuration Main
 			SetScript =
 			{
                                 # Install and configure DHCP service (used by Hyper-V nested VMs)
-                                Write-Header "Configuring DHCP Service"
                                 $dnsClient = Get-DnsClient | Where-Object {$_.InterfaceAlias -eq "Ethernet" }
                                 $dhcpScope = Get-DhcpServerv4Scope
                                 if ($dhcpScope.Name -ne "TechWorkshop") {
@@ -61,7 +63,6 @@ Configuration Main
                                 New-NetIPAddress -IPAddress 192.168.0.1 -PrefixLength 24 -InterfaceIndex $NatSwitch.ifIndex
 
                                 # Enable Enhanced Session Mode on Host
-                                Write-Header "Enabling Enhanced Session Mode"
                                 Set-VMHost -EnableEnhancedSessionMode $true
 
                                 # Download and create the Windows Server Guest VM
@@ -95,9 +96,8 @@ Configuration Main
                                         -Switch "NAT Switch"
 
                                 Start-VM -Name OnPremVM
-                                <#
+
                                 # Create the SQL Server VM
-                                Write-Header "Creating VM Credentials"
                                 # Hard-coded username and password for the nested SQL VM
                                 $nestedWindowsUsername = "Administrator"
                                 $nestedWindowsPassword = "JS123!!"
@@ -129,7 +129,6 @@ Configuration Main
 
                                 $sqlConfigFile = "C:\git\TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure\Hands-on lab\resources\deployment\onprem\sql-vm-config.ps1"
                                 Invoke-Command -VMName $sqlVMName -ScriptBlock { powershell -File $using:sqlConfigFile } -Credential $winCreds
-                                #>
 			}
 		}	
   	}
