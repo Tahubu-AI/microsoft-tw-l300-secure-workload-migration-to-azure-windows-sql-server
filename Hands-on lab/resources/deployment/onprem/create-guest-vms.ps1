@@ -89,7 +89,7 @@ Configuration Main
 
                                 # Create the Windows Server Guest VM
                                 New-VM -Name OnPremVM `
-                                        -MemoryStartupBytes 4GB `
+                                        -MemoryStartupBytes 2GB `
                                         -BootDevice VHD `
                                         -VHDPath "$vmFolder\WinServer\Virtual Hard Disks\WinServer.vhdx" `
                                         -Path "$vmFolder\WinServer\Virtual Hard Disks" `
@@ -119,7 +119,7 @@ Configuration Main
 
                                 # Create the SQL Server Guest VM
                                 New-VM -Name $sqlVMName `
-                                        -MemoryStartupBytes 8GB `
+                                        -MemoryStartupBytes 2GB `
                                         -BootDevice VHD `
                                         -VHDPath "$sqlVmVhdPath\$vhdImageToDownload" `
                                         -Path "$sqlVmVhdPath" `
