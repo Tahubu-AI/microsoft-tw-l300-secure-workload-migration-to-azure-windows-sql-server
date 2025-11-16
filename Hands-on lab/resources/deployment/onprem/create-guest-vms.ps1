@@ -119,7 +119,7 @@ Configuration Main
 
                                 # Create the SQL Server Guest VM
                                 New-VM -Name $sqlVMName `
-                                        -MemoryStartupBytes 4GB `
+                                        -MemoryStartupBytes 8GB `
                                         -BootDevice VHD `
                                         -VHDPath "$sqlVmVhdPath\$vhdImageToDownload" `
                                         -Path "$sqlVmVhdPath" `
