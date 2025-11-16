@@ -123,11 +123,14 @@ Configuration Main {
                                         -Generation 2 `
                                         -Switch "NAT Switch"
 
+                                $timeout = 600 # seconds
+
                                 Start-VM -Name $sqlVMName
+                                Wait-VM -Name $sqlVMName -For Running -Timeout $timeout
 
                                 # Wait until the VM is running
-                                while ((Get-VM -Name $sqlVMName).State -ne 'Running') {
-                                        Start-Sleep -Seconds 10
+                                if ((Get-VM -Name $sqlVMName).State -ne 'Running') {
+                                        Write-Error "VM $sqlVMName did not reach 'Running' state within $timeout seconds."
                                 }
 
                                 $sqlConfigFileName = "sql-vm-config.ps1"
