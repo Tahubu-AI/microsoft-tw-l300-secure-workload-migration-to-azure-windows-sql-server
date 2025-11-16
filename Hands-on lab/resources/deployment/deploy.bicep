@@ -1003,7 +1003,7 @@ resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2
     properties: {
         publisher: 'Microsoft.Powershell'
         type: 'CustomScriptExtension'
-        typeHandlerVersion: '10'
+        typeHandlerVersion: '1.10'
         autoUpgradeMinorVersion: true
         settings: {
             fileUris: [
