@@ -1,6 +1,3 @@
-// @description('The prefix base used to name resources created.')
-// @maxLength(15)
-// param resourceNameBase string = 'tailspin${take(uniqueString(resourceGroup().id), 7)}'
 var resourceNameBase = 'tailspin${take(uniqueString(resourceGroup().id), 7)}'
 
 @description('The Id of the Azure AD User.')
@@ -10,8 +7,8 @@ param azureAdUserLogin string
 
 @description('The VM size for the virtual machines. Allows Intel and AMD 4-core options with premium and non-premium storage.')
 @allowed([
-    'Standard_D4s_v5' // Default value
-    'Standard_D4s_v4'
+    'Standard_D4s_v4' // Default value
+    'Standard_D4s_v5'
     'Standard_D4as_v5' // AMD-based, 4 vCPUs, premium storage
     'Standard_D4_v5' // Intel-based, 4 vCPUs, non-premium storage
     'Standard_D4a_v4' // AMD-based, 4 vCPUs, non-premium storage
@@ -19,7 +16,7 @@ param azureAdUserLogin string
     'Standard_D4ds_v5' // Intel-based, 4 vCPUs, premium storage
     'Standard_D4as_v4' // AMD-based, 4 vCPUs, non-premium storage
 ])
-param onpremVMSize string = 'Standard_D4s_v5'
+param onpremVMSize string = 'Standard_D4s_v4'
 
 @description('The SKU of the SQL Managed Instance.')
 @allowed([
@@ -27,6 +24,7 @@ param onpremVMSize string = 'Standard_D4s_v5'
     'GP_Gen5'
 ])
 param sqlmiSku string = 'GP_Gen5'
+
 @description('The number of vCores for the SQL Managed Instance.')
 @allowed([
     4
@@ -42,39 +40,31 @@ var spokeNamePrefix = '${resourceNameBase}-spoke-'
 var sqlmiPrefix = '${resourceNameBase}-sqlmi'
 var sqlmiStorageName = '${resourceNameBase}sqlmistor'
 
-var onpremSQLVMNamePrefix = '${onpremNamePrefix}sql-'
 var onpremHyperVHostVMNamePrefix = '${onpremNamePrefix}hyperv-'
 
-var GitHubScriptRepo = 'microsoft/TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure'
+var GitHubScriptRepo = 'Tahubu-AI/microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server' //'microsoft/TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure'
 var GitHubScriptRepoBranch = 'main'
 var GitHubScriptRepoBranchURL = 'https://raw.githubusercontent.com/${GitHubScriptRepo}/${GitHubScriptRepoBranch}/Hands-on lab/resources/deployment/'
 
-var HyperVHostConfigArchiveFileName = 'create-vm.zip'
-var HyperVHostConfigArchiveScriptName = 'create-vm.ps1'
+var HyperVHostConfigArchiveFileName = 'create-guest-vms.zip'
+var HyperVHostGuestVmsScriptName =  'create-guest-vms.ps1'
 var HyperVHostConfigURL = '${GitHubScriptRepoBranchURL}onprem/${HyperVHostConfigArchiveFileName}'
 
 var HyperVHostInstallHyperVScriptFolder = '.'
 var HyperVHostInstallHyperVScriptFileName = 'install-hyper-v.ps1'
 var HyperVHostInstallHyperVURL = '${GitHubScriptRepoBranchURL}onprem/${HyperVHostInstallHyperVScriptFileName}'
 
-var SQLVMConfigFileName = 'sql-vm-config.zip'
-var SQLVMConfigScriptName = 'sql-vm-config.ps1'
-var SQLVMConfigURL = '${GitHubScriptRepoBranchURL}onprem/${SQLVMConfigFileName}'
-
 var labUsername = 'demouser'
 var labPassword = 'demo!pass123'
 var labSqlMIPassword = 'demo!pass1234567'
 
 var tags = {
-    purpose: 'techexcel'
+    purpose: 'tech-workshop'
 }
-
-
 
 /* ****************************
 Virtual Networks
 **************************** */
-
 resource onprem_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
     name: '${onpremNamePrefix}vnet'
     location: location
@@ -165,12 +155,9 @@ resource spoke_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
     }
 }
 
-
-
 /* ****************************
 Virtual Network Peerings
 **************************** */
-
 resource hub_onprem_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2020-11-01' = {
     parent: hub_vnet
     name: 'hub-onprem'
@@ -238,8 +225,6 @@ resource hub_spoke_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetwor
         }
     }
 }
-
-
 
 /* ****************************
 Azure SQL Managed Instance
@@ -854,12 +839,9 @@ resource sqlmi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2022-01-01' =
     }
 }
 
-
-
 /* ****************************
 Azure Bastion
 **************************** */
-
 resource hub_bastion 'Microsoft.Network/bastionHosts@2023-09-01' = {
     name: '${hubNamePrefix}bastion'
     location: location
@@ -899,12 +881,9 @@ resource hub_bastion_public_ip 'Microsoft.Network/publicIPAddresses@2020-11-01' 
     }
 }
 
-
-
 /* ****************************
 On-premises Hyper-V Host VM
 **************************** */
-
 resource onprem_hyperv_nic 'Microsoft.Network/networkInterfaces@2021-03-01' = {
     name: '${onpremHyperVHostVMNamePrefix}nic'
     location: location
@@ -1005,9 +984,9 @@ resource onprem_hyperv_vm_ext_installhyperv 'Microsoft.Compute/virtualMachines/e
     }
 }
 
-resource onprem_hyperv_vm_ext_createvm 'Microsoft.Compute/virtualMachines/extensions@2017-12-01' = {
+resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2017-12-01' = {
     parent: onprem_hyperv_vm
-    name: 'CreateWinServerVM'
+    name: 'CreateGuestVMs'
     location: location
     tags: tags
     dependsOn: [
@@ -1021,116 +1000,10 @@ resource onprem_hyperv_vm_ext_createvm 'Microsoft.Compute/virtualMachines/extens
         settings: {
             configuration: {
                 url: HyperVHostConfigURL
-                script: HyperVHostConfigArchiveScriptName
+                script: HyperVHostGuestVmsScriptName
                 function: 'Main'
             }
         }
     }
 }
 
-
-
-/* ****************************
-On-premises SQL VM
-**************************** */
-
-resource onprem_sqlvm_nic 'Microsoft.Network/networkInterfaces@2021-03-01' = {
-    name: '${onpremSQLVMNamePrefix}nic'
-    location: location
-    tags: tags
-    properties: {
-        ipConfigurations: [
-            {
-                name: 'ipconfig1'
-                properties: {
-                    subnet: {
-                        id: '${onprem_vnet.id}/subnets/default'
-                    }
-                    privateIPAllocationMethod: 'Dynamic'
-                }
-            }
-        ]
-        networkSecurityGroup: {
-            id: onprem_sqlvm_nsg.id
-        }
-    }
-}
-
-resource onprem_sqlvm_nsg 'Microsoft.Network/networkSecurityGroups@2019-02-01' = {
-    name: '${onpremSQLVMNamePrefix}nsg'
-    location: location
-    tags: tags
-    properties: {
-        securityRules: [
-            {
-                name: 'RDP'
-                properties: {
-                    protocol: 'TCP'
-                    sourcePortRange: '*'
-                    destinationPortRange: '3389'
-                    sourceAddressPrefix: '*'
-                    destinationAddressPrefix: '*'
-                    access: 'Allow'
-                    priority: 100
-                    direction: 'Inbound'
-                }
-            }
-        ]
-    }
-}
-
-resource onprem_sqlvm_vm 'Microsoft.Compute/virtualMachines@2021-07-01' = {
-    name: '${onpremSQLVMNamePrefix}vm'
-    location: location
-    tags: tags
-    properties: {
-        hardwareProfile: {
-            vmSize: onpremVMSize
-        }
-        storageProfile: {
-            osDisk: {
-                createOption: 'fromImage'
-            }
-            imageReference: {
-                publisher: 'MicrosoftSQLServer'
-                offer: 'SQL2019-WS2022'
-                sku: 'Standard'
-                version: 'latest'
-            }
-        }
-        networkProfile: {
-            networkInterfaces: [
-                {
-                    id: onprem_sqlvm_nic.id
-                }
-            ]
-        }
-        osProfile: {
-            computerName: 'SQLServer'
-#disable-next-line adminusername-should-not-be-literal
-            adminUsername: labUsername
-#disable-next-line use-secure-value-for-secure-inputs
-            adminPassword: labPassword
-        }
-    }
-}
-
-resource onprem_sqlvm_vm_ext_sqlvmconfig 'Microsoft.Compute/virtualMachines/extensions@2017-12-01' = {
-    parent: onprem_sqlvm_vm
-    name: 'SQLVMConfig'
-    location: location
-    tags: tags
-    properties: {
-        publisher: 'Microsoft.Powershell'
-        type: 'DSC'
-        typeHandlerVersion: '2.9'
-        autoUpgradeMinorVersion: true
-        settings: {
-            configuration: {
-                url: SQLVMConfigURL
-                script: SQLVMConfigScriptName
-                function: 'Main'
-            }
-        }
-    }
-}
