@@ -58,6 +58,9 @@ Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\.NetFramework\v4.0.30319' -Name
 # Install Nuget
 Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
 
+# Install the DHCP service
+Install-WindowsFeature -Name "DHCP" -IncludeManagementTools
+
 # Install Hyper-V and Reboot
 Install-WindowsFeature -Name Hyper-V `
                        -IncludeAllSubFeature `
