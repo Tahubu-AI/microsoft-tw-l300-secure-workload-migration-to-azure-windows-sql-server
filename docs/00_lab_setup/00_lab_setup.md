@@ -19,10 +19,10 @@ In this first exercise, you will deploy the resources needed to simulate the on-
 
 After you complete this exercise, you will be able to:
 
-- Validate Resource providers
-- Retrieve your Entra ID user ID and User Principal Name (UPN)
+- Validate and register Azure resource providers
+- Retrieve your Entra ID account information using the Azure CLI
 - Deploy Azure resources using an ARM Template
 
 ## Lab Duration
 
-- **Estimated Time:** 25 minutes
+- **Estimated Time:** 90 minutes
