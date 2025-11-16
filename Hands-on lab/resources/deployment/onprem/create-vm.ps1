@@ -56,6 +56,7 @@ Configuration Main
 
                 New-NetNat -Name NestedVMNATnetwork -InternalIPInterfaceAddressPrefix 192.168.0.0/24 -Verbose
 
+                # Create the Windows Server Guest VM
                 New-VM -Name OnPremVM `
                         -MemoryStartupBytes 4GB `
                         -BootDevice VHD `
@@ -65,6 +66,27 @@ Configuration Main
                         -Switch "NAT Switch"
 
                 Start-VM -Name OnPremVM
+
+                # Create the SQL Server VM
+                $sqlVmVhdPath = "C:\VM\SQLServer"
+                mkdir $sqlVmVhdPath
+
+                # Download the SQL Server VHD using AzCopy
+                $sourceUrl = "https://jumpstartprodsg.blob.core.windows.net/scenarios/prod"
+                $vhdImageToDownload = "JSSQLStd19Base.vhdx"
+                $vhdImageUrl = "$sourceUrl/$vhdImageToDownload"
+                azcopy cp $vhdImageUrl $sqlVmVhdPath --recursive=true --check-length=false --log-level=ERROR
+
+                # Create the SQL Server Guest VM
+                New-VM -Name OnPremSQLVM `
+                        -MemoryStartupBytes 4GB `
+                        -BootDevice VHD `
+                        -VHDPath "$sqlVmVhdPath\$vhdImageToDownload" `
+                        -Path "$sqlVmVhdPath" `
+                        -Generation 1 `
+                        -Switch "NAT Switch"
+
+                Start-VM -Name OnPremSQLVM
 			}
 		}	
   	}
