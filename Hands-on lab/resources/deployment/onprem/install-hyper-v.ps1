@@ -55,6 +55,18 @@ Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\.NetFramework\v4.0.30319' -Name
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+# Install Chocolatey if not already present
+if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+    Set-ExecutionPolicy Bypass -Scope Process -Force
+    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+}
+
+# Refresh PATH for current session
+$env:Path += ";$env:ALLUSERSPROFILE\chocolatey\bin"
+
+# Install AzCopy silently
+choco install azcopy --yes --no-progress
+
 # Install Nuget
 Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
 
