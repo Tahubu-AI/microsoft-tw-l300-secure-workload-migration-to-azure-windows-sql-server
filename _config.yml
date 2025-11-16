@@ -2,8 +2,6 @@ title: Migrate Windows & SQL workloads to Azure
 description: This lab teaches you how to prepare for and securely migrate Windows Server and SQL Server workloads to Azure.
 theme: just-the-docs
 
-# url: https://microsoft.github.io/TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure//
-
 aux_links:
   "TechWorkshop L300: Secure Workload Migration to Azure - Windows Server & SQL Server": 
     - "https://github.com/Tahubu-AI/microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"

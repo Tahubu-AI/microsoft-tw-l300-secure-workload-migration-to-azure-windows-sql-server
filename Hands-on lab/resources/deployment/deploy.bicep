@@ -32,28 +32,37 @@ param sqlmiSku string = 'GP_Gen5'
 ])
 param sqlmiVCores int = 8
 
+@description('The branch of the GitHub repository to use for deployment scripts.')
+param repositoryBranch string = 'main'
+@description('The name of the GitHub repository containing deployment scripts.')
+param repositoryName string = 'microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server'
+@description('The owner of the GitHub repository containing deployment scripts.')
+@allowed([
+    'microsoft'
+    'Tahubu-AI'
+])
+param repositoryOwner string = 'Tahubu-AI'
+
 var location = resourceGroup().location
 
-var onpremNamePrefix = '${resourceNameBase}-onprem-'
-var hubNamePrefix = '${resourceNameBase}-hub-'
-var spokeNamePrefix = '${resourceNameBase}-spoke-'
+var onpremNamePrefix = '${resourceNameBase}-onprem'
+var hubNamePrefix = '${resourceNameBase}-hub'
+var spokeNamePrefix = '${resourceNameBase}-spoke'
 var sqlmiPrefix = '${resourceNameBase}-sqlmi'
 var sqlmiStorageName = '${resourceNameBase}sqlmistor'
 
-var onpremHyperVHostVMNamePrefix = '${onpremNamePrefix}hyperv-'
+var onpremHyperVHostVMNamePrefix = '${onpremNamePrefix}-hyperv'
 
-var GitHubScriptRepo = 'Tahubu-AI/microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server' //'microsoft/TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure'
-var GitHubScriptRepoBranch = 'main'
-var GitHubScriptRepoBranchURL = 'https://raw.githubusercontent.com/${GitHubScriptRepo}/${GitHubScriptRepoBranch}/Hands-on lab/resources/deployment/'
+var GitHubRepo = '${repositoryOwner}/${repositoryName}'
+var GitHubRepoScriptPath = 'Hands-on%20lab/resources/deployment/onprem'
+var GitHubRepoUrl = 'https://raw.githubusercontent.com/${GitHubRepo}/${repositoryBranch}/${GitHubRepoScriptPath}'
 
 var HyperVHostConfigArchiveFileName = 'create-guest-vms.zip'
 var HyperVHostGuestVmsScriptName =  'create-guest-vms.ps1'
-var HyperVHostConfigURL = '${GitHubScriptRepoBranchURL}onprem/${HyperVHostConfigArchiveFileName}'
-
+var HyperVHostConfigURL = '${GitHubRepoUrl}/${HyperVHostConfigArchiveFileName}'
 var HyperVHostInstallHyperVScriptFolder = '.'
 var HyperVHostInstallHyperVScriptFileName = 'install-hyper-v.ps1'
-var HyperVHostInstallHyperVURL = '${GitHubScriptRepoBranchURL}onprem/${HyperVHostInstallHyperVScriptFileName}'
-
+var HyperVHostInstallHyperVURL = '${GitHubRepoUrl}/${HyperVHostInstallHyperVScriptFileName}'
 var labUsername = 'demouser'
 var labPassword = 'demo!pass123'
 var labSqlMIPassword = 'demo!pass1234567'
@@ -66,7 +75,7 @@ var tags = {
 Virtual Networks
 **************************** */
 resource onprem_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
-    name: '${onpremNamePrefix}vnet'
+    name: '${onpremNamePrefix}-vnet'
     location: location
     tags: tags
     properties: {
@@ -87,7 +96,7 @@ resource onprem_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
 }
 
 resource hub_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
-    name: '${hubNamePrefix}vnet'
+    name: '${hubNamePrefix}-vnet'
     location: location
     tags: tags
     properties: {
@@ -114,7 +123,7 @@ resource hub_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
 }
 
 resource spoke_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
-    name: '${spokeNamePrefix}vnet'
+    name: '${spokeNamePrefix}-vnet'
     location: location
     tags: tags
     properties: {
@@ -229,7 +238,6 @@ resource hub_spoke_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetwor
 /* ****************************
 Azure SQL Managed Instance
 **************************** */
-
 resource sqlmi_storage 'Microsoft.Storage/storageAccounts@2022-05-01' = {
     name: sqlmiStorageName
     location: location
@@ -843,7 +851,7 @@ resource sqlmi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2022-01-01' =
 Azure Bastion
 **************************** */
 resource hub_bastion 'Microsoft.Network/bastionHosts@2023-09-01' = {
-    name: '${hubNamePrefix}bastion'
+    name: '${hubNamePrefix}-bastion'
     location: location
     tags: tags
     sku: {
@@ -868,7 +876,7 @@ resource hub_bastion 'Microsoft.Network/bastionHosts@2023-09-01' = {
 }
 
 resource hub_bastion_public_ip 'Microsoft.Network/publicIPAddresses@2020-11-01' = {
-    name: '${hubNamePrefix}bastion-pip'
+    name: '${hubNamePrefix}-bastion-pip'
     location: location
     tags: tags
     sku: {
@@ -885,7 +893,7 @@ resource hub_bastion_public_ip 'Microsoft.Network/publicIPAddresses@2020-11-01' 
 On-premises Hyper-V Host VM
 **************************** */
 resource onprem_hyperv_nic 'Microsoft.Network/networkInterfaces@2021-03-01' = {
-    name: '${onpremHyperVHostVMNamePrefix}nic'
+    name: '${onpremHyperVHostVMNamePrefix}-nic'
     location: location
     tags: tags
     properties: {
@@ -907,7 +915,7 @@ resource onprem_hyperv_nic 'Microsoft.Network/networkInterfaces@2021-03-01' = {
 }
 
 resource onprem_hyperv_nsg 'Microsoft.Network/networkSecurityGroups@2019-02-01' = {
-    name: '${onpremHyperVHostVMNamePrefix}nsg'
+    name: '${onpremHyperVHostVMNamePrefix}-nsg'
     location: location
     tags: tags
     properties: {
@@ -930,7 +938,7 @@ resource onprem_hyperv_nsg 'Microsoft.Network/networkSecurityGroups@2019-02-01' 
 }
 
 resource onprem_hyperv_vm 'Microsoft.Compute/virtualMachines@2021-07-01' = {
-    name: '${onpremHyperVHostVMNamePrefix}vm'
+    name: '${onpremHyperVHostVMNamePrefix}-vm'
     location: location
     tags: tags
     properties: {
@@ -1003,6 +1011,9 @@ resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2
                 script: HyperVHostGuestVmsScriptName
                 function: 'Main'
             }
+            // Custom parameters to be passed to the DSC configuration
+            repoOwner: repositoryOwner
+            repoName: repositoryName
         }
     }
 }
