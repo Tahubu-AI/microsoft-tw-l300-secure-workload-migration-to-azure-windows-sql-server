@@ -111,14 +111,7 @@ Configuration Main
                                 mkdir $sqlVmVhdPath
                                 $sqlVMName = "OnPremSQLVM"
 
-                                # Download the SQL Server VHD using AzCopy
-                                #$sourceUrl = "https://jumpstartprodsg.blob.core.windows.net/scenarios/prod"
                                 $vhdImageToDownload = "JSSQLStd19Base.vhdx"
-                                #$vhdImageUrl = "$sourceUrl/$vhdImageToDownload"
-
-                                #$azcopyExe = "C:\ProgramData\chocolatey\bin\azcopy.exe"
-                                #& $azcopyExe cp $vhdImageUrl $sqlVmVhdPath --recursive=true --check-length=false --log-level=ERROR
-
                                 $sourceUrl = "https://jumpstartprodsg.blob.core.windows.net/scenarios/prod/$vhdImageToDownload"
                                 $destinationPath = "$sqlVmVhdPath\$vhdImageToDownload"
 
