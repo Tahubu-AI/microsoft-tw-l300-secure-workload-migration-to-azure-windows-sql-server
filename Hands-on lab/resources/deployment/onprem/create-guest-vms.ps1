@@ -35,20 +35,21 @@ Configuration Main
                                 $dnsClient = Get-DnsClient | Where-Object {$_.InterfaceAlias -eq "Ethernet" }
                                 $dhcpScope = Get-DhcpServerv4Scope
                                 if ($dhcpScope.Name -ne "TechWorkshop") {
-                                        Add-DhcpServerv4Scope -Name "TechWorkshop" `
-                                                -StartRange 10.10.1.100 `
-                                                -EndRange 10.10.1.200 `
-                                                -SubnetMask 255.255.255.0 `
-                                                -LeaseDuration 1.00:00:00 `
-                                                -State Active
+                                Add-DhcpServerv4Scope -Name "TechWorkshop" `
+                                        -StartRange 192.168.0.100 `
+                                        -EndRange 192.168.0.200 `
+                                        -SubnetMask 255.255.255.0 `
+                                        -LeaseDuration 1.00:00:00 `
+                                        -State Active
                                 }
 
                                 $dhcpOptions = Get-DhcpServerv4OptionValue                      
                                 if ($dhcpOptions.Count -lt 3) {
+                                        # Set DHCP options to match NAT gateway
                                         Set-DhcpServerv4OptionValue -ComputerName localhost `
                                                 -DnsDomain $dnsClient.ConnectionSpecificSuffix `
-                                                -DnsServer 168.63.129.16 `
-                                                -Router 10.10.1.1
+                                                -DnsServer 8.8.8.8 `
+                                                -Router 192.168.0.1
                                         Restart-Service dhcpserver
                                 }
 
