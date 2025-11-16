@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "4160768026050902837"
+      "templateHash": "11163383067110646099"
     }
   },
   "parameters": {
@@ -98,9 +98,8 @@
     "GitHubRepo": "[format('{0}/{1}', parameters('repositoryOwner'), parameters('repositoryName'))]",
     "GitHubRepoScriptPath": "Hands-on%20lab/resources/deployment/onprem",
     "GitHubRepoUrl": "[format('https://raw.githubusercontent.com/{0}/{1}/{2}', variables('GitHubRepo'), parameters('repositoryBranch'), variables('GitHubRepoScriptPath'))]",
-    "HyperVHostConfigArchiveFileName": "create-guest-vms.zip",
     "HyperVHostGuestVmsScriptName": "create-guest-vms.ps1",
-    "HyperVHostConfigURL": "[format('{0}/{1}', variables('GitHubRepoUrl'), variables('HyperVHostConfigArchiveFileName'))]",
+    "HyperVHostConfigURL": "[format('{0}/{1}', variables('GitHubRepoUrl'), variables('HyperVHostGuestVmsScriptName'))]",
     "HyperVHostInstallHyperVScriptFolder": ".",
     "HyperVHostInstallHyperVScriptFileName": "install-hyper-v.ps1",
     "HyperVHostInstallHyperVURL": "[format('{0}/{1}', variables('GitHubRepoUrl'), variables('HyperVHostInstallHyperVScriptFileName'))]",
@@ -1054,7 +1053,7 @@
       "properties": {
         "publisher": "Microsoft.Compute",
         "type": "CustomScriptExtension",
-        "typeHandlerVersion": "1.4",
+        "typeHandlerVersion": "1.10",
         "autoUpgradeMinorVersion": true,
         "settings": {
           "fileUris": [
@@ -1075,17 +1074,14 @@
       "tags": "[variables('tags')]",
       "properties": {
         "publisher": "Microsoft.Powershell",
-        "type": "DSC",
-        "typeHandlerVersion": "2.9",
+        "type": "CustomScriptExtension",
+        "typeHandlerVersion": "10",
         "autoUpgradeMinorVersion": true,
         "settings": {
-          "configuration": {
-            "url": "[variables('HyperVHostConfigURL')]",
-            "script": "[variables('HyperVHostGuestVmsScriptName')]",
-            "function": "Main"
-          },
-          "repoOwner": "[parameters('repositoryOwner')]",
-          "repoName": "[parameters('repositoryName')]"
+          "fileUris": [
+            "[variables('HyperVHostConfigURL')]"
+          ],
+          "commandToExecute": "[format('powershell -ExecutionPolicy Bypass -File {0}', variables('HyperVHostGuestVmsScriptName'))]"
         }
       },
       "dependsOn": [

@@ -57,9 +57,9 @@ var GitHubRepo = '${repositoryOwner}/${repositoryName}'
 var GitHubRepoScriptPath = 'Hands-on%20lab/resources/deployment/onprem'
 var GitHubRepoUrl = 'https://raw.githubusercontent.com/${GitHubRepo}/${repositoryBranch}/${GitHubRepoScriptPath}'
 
-var HyperVHostConfigArchiveFileName = 'create-guest-vms.zip'
+//var HyperVHostConfigArchiveFileName = 'create-guest-vms.zip'
 var HyperVHostGuestVmsScriptName =  'create-guest-vms.ps1'
-var HyperVHostConfigURL = '${GitHubRepoUrl}/${HyperVHostConfigArchiveFileName}'
+var HyperVHostConfigURL = '${GitHubRepoUrl}/${HyperVHostGuestVmsScriptName}'
 var HyperVHostInstallHyperVScriptFolder = '.'
 var HyperVHostInstallHyperVScriptFileName = 'install-hyper-v.ps1'
 var HyperVHostInstallHyperVURL = '${GitHubRepoUrl}/${HyperVHostInstallHyperVScriptFileName}'
@@ -981,7 +981,7 @@ resource onprem_hyperv_vm_ext_installhyperv 'Microsoft.Compute/virtualMachines/e
     properties: {
         publisher: 'Microsoft.Compute'
         type: 'CustomScriptExtension'
-        typeHandlerVersion: '1.4'
+        typeHandlerVersion: '1.10'
         autoUpgradeMinorVersion: true
         settings: {
             fileUris: [
@@ -1002,18 +1002,14 @@ resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2
     ]
     properties: {
         publisher: 'Microsoft.Powershell'
-        type: 'DSC'
-        typeHandlerVersion: '2.9'
+        type: 'CustomScriptExtension'
+        typeHandlerVersion: '10'
         autoUpgradeMinorVersion: true
         settings: {
-            configuration: {
-                url: HyperVHostConfigURL
-                script: HyperVHostGuestVmsScriptName
-                function: 'Main'
-            }
-            // Custom parameters to be passed to the DSC configuration
-            repoOwner: repositoryOwner
-            repoName: repositoryName
+            fileUris: [
+                HyperVHostConfigURL
+            ]
+            commandToExecute: 'powershell -ExecutionPolicy Bypass -File ${HyperVHostGuestVmsScriptName}'
         }
     }
 }
