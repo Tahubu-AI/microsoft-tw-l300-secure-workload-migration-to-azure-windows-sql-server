@@ -28,26 +28,6 @@ Configuration Main
 		
 			SetScript =
 			{
-                                $cloneDir = "C:\git"
-                                mkdir $cloneDir
-                                Set-Location $cloneDir
-
-                                git lfs install --skip-smudge
-                                git clone --quiet --single-branch "https://github.com/microsoft/TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure.git"
-                                Set-Location "$cloneDir\TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure\"
-                                git pull
-                                git lfs pull
-                                git lfs install --force
-
-                                $downloadedFile = "$cloneDir\TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
-                                
-                                $vmFolder = "C:\VM"
-
-                                Add-Type -assembly "system.io.compression.filesystem"
-                                [io.compression.zipfile]::ExtractToDirectory($downloadedFile, $vmFolder)
-                                # The following command was used to Zip up the VM files originally
-                                # [io.compression.zipfile]::CreateFromDirectory("C:\OnPremWinServerVM", "C:\OnPremWinServerVM.zip")
-
                                 # Install and configure DHCP service (used by Hyper-V nested VMs)
                                 Write-Header "Configuring DHCP Service"
                                 $dnsClient = Get-DnsClient | Where-Object {$_.InterfaceAlias -eq "Ethernet" }
@@ -84,6 +64,27 @@ Configuration Main
                                 Write-Header "Enabling Enhanced Session Mode"
                                 Set-VMHost -EnableEnhancedSessionMode $true
 
+                                # Download and create the Windows Server Guest VM
+                                $cloneDir = "C:\git"
+                                mkdir $cloneDir
+                                Set-Location $cloneDir
+
+                                git lfs install --skip-smudge
+                                git clone --quiet --single-branch "https://github.com/microsoft/TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure.git"
+                                Set-Location "$cloneDir\TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure\"
+                                git pull
+                                git lfs pull
+                                git lfs install --force
+
+                                $downloadedFile = "$cloneDir\TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
+                                
+                                $vmFolder = "C:\VM"
+
+                                Add-Type -assembly "system.io.compression.filesystem"
+                                [io.compression.zipfile]::ExtractToDirectory($downloadedFile, $vmFolder)
+                                # The following command was used to Zip up the VM files originally
+                                # [io.compression.zipfile]::CreateFromDirectory("C:\OnPremWinServerVM", "C:\OnPremWinServerVM.zip")
+
                                 # Create the Windows Server Guest VM
                                 New-VM -Name OnPremVM `
                                         -MemoryStartupBytes 4GB `
@@ -94,7 +95,7 @@ Configuration Main
                                         -Switch "NAT Switch"
 
                                 Start-VM -Name OnPremVM
-
+                                <#
                                 # Create the SQL Server VM
                                 Write-Header "Creating VM Credentials"
                                 # Hard-coded username and password for the nested SQL VM
@@ -128,6 +129,7 @@ Configuration Main
 
                                 $sqlConfigFile = "C:\git\TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure\Hands-on lab\resources\deployment\onprem\sql-vm-config.ps1"
                                 Invoke-Command -VMName $sqlVMName -ScriptBlock { powershell -File $using:sqlConfigFile } -Credential $winCreds
+                                #>
 			}
 		}	
   	}
