@@ -49,12 +49,41 @@ Configuration Main
                 # The following command was used to Zip up the VM files originally
                 # [io.compression.zipfile]::CreateFromDirectory("C:\OnPremWinServerVM", "C:\OnPremWinServerVM.zip")
 
+                # Install and configure DHCP service (used by Hyper-V nested VMs)
+                Write-Header "Configuring DHCP Service"
+                $dnsClient = Get-DnsClient | Where-Object {$_.InterfaceAlias -eq "Ethernet" }
+                $dhcpScope = Get-DhcpServerv4Scope
+                if ($dhcpScope.Name -ne "ArcJS") {
+                Add-DhcpServerv4Scope -Name "ArcJS" `
+                                        -StartRange 10.10.1.100 `
+                                        -EndRange 10.10.1.200 `
+                                        -SubnetMask 255.255.255.0 `
+                                        -LeaseDuration 1.00:00:00 `
+                                        -State Active
+                }
+
+                $dhcpOptions = Get-DhcpServerv4OptionValue                      
+                if ($dhcpOptions.Count -lt 3) {
+                Set-DhcpServerv4OptionValue -ComputerName localhost `
+                                        -DnsDomain $dnsClient.ConnectionSpecificSuffix `
+                                        -DnsServer 168.63.129.16 `
+                                        -Router 10.10.1.1
+                Restart-Service dhcpserver
+                }
+
+                # Create the NAT network
+                New-NetNat -Name NestedVMNATnetwork -InternalIPInterfaceAddressPrefix 192.168.0.0/24 -Verbose
+
+                # Create the Internal Switch with NAT
                 New-VMSwitch -Name 'NAT Switch' -SwitchType Internal
 
                 $NatSwitch = Get-NetAdapter -Name "vEthernet (NAT Switch)"
+                # Create an internal network (gateway first)
                 New-NetIPAddress -IPAddress 192.168.0.1 -PrefixLength 24 -InterfaceIndex $NatSwitch.ifIndex
 
-                New-NetNat -Name NestedVMNATnetwork -InternalIPInterfaceAddressPrefix 192.168.0.0/24 -Verbose
+                # Enable Enhanced Session Mode on Host
+                Write-Header "Enabling Enhanced Session Mode"
+                Set-VMHost -EnableEnhancedSessionMode $true
 
                 # Create the Windows Server Guest VM
                 New-VM -Name OnPremVM `
@@ -68,8 +97,18 @@ Configuration Main
                 Start-VM -Name OnPremVM
 
                 # Create the SQL Server VM
+                Write-Header "Creating VM Credentials"
+                # Hard-coded username and password for the nested SQL VM
+                $nestedWindowsUsername = "Administrator"
+                $nestedWindowsPassword = "JS123!!"
+
+                # Create Windows credential object
+                $secWindowsPassword = ConvertTo-SecureString $nestedWindowsPassword -AsPlainText -Force
+                $winCreds = New-Object System.Management.Automation.PSCredential ($nestedWindowsUsername, $secWindowsPassword)
+
                 $sqlVmVhdPath = "C:\VM\SQLServer"
                 mkdir $sqlVmVhdPath
+                $sqlVMName = "OnPremSQLVM"
 
                 # Download the SQL Server VHD using AzCopy
                 $sourceUrl = "https://jumpstartprodsg.blob.core.windows.net/scenarios/prod"
@@ -78,15 +117,18 @@ Configuration Main
                 azcopy cp $vhdImageUrl $sqlVmVhdPath --recursive=true --check-length=false --log-level=ERROR
 
                 # Create the SQL Server Guest VM
-                New-VM -Name OnPremSQLVM `
+                New-VM -Name $sqlVMName `
                         -MemoryStartupBytes 4GB `
                         -BootDevice VHD `
                         -VHDPath "$sqlVmVhdPath\$vhdImageToDownload" `
                         -Path "$sqlVmVhdPath" `
-                        -Generation 1 `
+                        -Generation 2 `
                         -Switch "NAT Switch"
 
-                Start-VM -Name OnPremSQLVM
+                Start-VM -Name $sqlVMName
+
+                $sqlConfigFile = "C:\git\TechExcel-Securely-migrate-Windows-Server-and-SQL-Server-workloads-to-Azure\Hands-on lab\resources\deployment\onprem\sql-vm-config.ps1"
+                Invoke-Command -VMName $sqlVMName -ScriptBlock { powershell -File $using:sqlConfigFile } -Credential $winCreds
 			}
 		}	
   	}
