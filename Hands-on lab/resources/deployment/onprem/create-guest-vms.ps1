@@ -13,7 +13,8 @@
 
 Configuration Main {
         Param (
-                [String]$RepositoryName
+                [String]$RepoName,
+                [String]$RepoOwner
         )
         Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
@@ -26,10 +27,10 @@ Configuration Main {
                                 if (-not (Test-Path $logPath)) {
                                         New-Item -ItemType Directory -Path $logPath -Force | Out-Null
                                 }
-                                "Using variables: RepositoryName:$using:RepositoryName" | Out-File "$logPath\params.txt"
+                                "Using parameters: RepoName:$using:RepoName, RepoOwner:$using:RepoOwner" | Out-File "$logPath\params.txt"
                         }
                 }
-<#
+
                 # 1. Install DHCP role
                 Script InstallDHCP {
                         GetScript  = { @{ Result = (Get-WindowsFeature -Name DHCP).Installed } }
@@ -112,29 +113,26 @@ Configuration Main {
 
                 # 7. Clone Repo for VM Artifacts
                 Script CloneRepo {
-                        GetScript  = { @{ Result = (Test-Path "C:\git\$RepoName") } }
-                        TestScript = { Test-Path "C:\git\$RepoName" }
+                        GetScript  = { @{ Result = (Test-Path "C:\git\$using:RepoName") } }
+                        TestScript = { Test-Path "C:\git\$using:RepoName" }
                         SetScript  = {
-                                $RepoOwner = "Tahubu-AI"
-                                $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
-
-                                Write-Verbose "Cloning repo $RepoOwner/$RepoName..."
+                                Write-Verbose "Cloning repo $using:RepoOwner/$using:RepoName..."
 
                                 $cloneDir = "C:\git"
                                 if (-not (Test-Path $cloneDir)) { New-Item -ItemType Directory -Path $cloneDir -Force }
                                 Set-Location $cloneDir
-                                if (-not (Test-Path "$cloneDir\$RepoName")) {
+                                if (-not (Test-Path "$cloneDir\$using:RepoName")) {
                                         git lfs install --skip-smudge
-                                        git clone --quiet --single-branch "https://github.com/$RepoOwner/$RepoName.git"
+                                        git clone --quiet --single-branch "https://github.com/$using:RepoOwner/$using:RepoName.git"
                                 }
-                                if (Test-Path "$cloneDir\$RepoName\.git") {
-                                        Push-Location "$cloneDir\$RepoName"
+                                if (Test-Path "$cloneDir\$using:RepoName\.git") {
+                                        Push-Location "$cloneDir\$using:RepoName"
                                         git pull
                                         git lfs pull
                                         Pop-Location
                                 }
                                 else {
-                                        throw "Expected repo at $cloneDir\$RepoName but .git folder not found."
+                                        throw "Expected repo at $cloneDir\$using:RepoName but .git folder not found."
                                 }
                         }
                 }
@@ -145,10 +143,10 @@ Configuration Main {
                         TestScript = { (Get-VM -Name "OnPremVM" -ErrorAction SilentlyContinue) -ne $null }
                         SetScript  = {
                                 Write-Verbose "Creating OnPrem Windows Server VM..."
-                                $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
+
                                 $vmFolder = "C:\VM"
                                 if (-not (Test-Path $vmFolder)) { New-Item -ItemType Directory -Path $vmFolder -Force }
-                                $downloadedFile = "C:\git\$RepoName\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
+                                $downloadedFile = "C:\git\$using:RepoName\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
                                 Add-Type -AssemblyName "System.IO.Compression.FileSystem"
                                 if (-not (Test-Path "$vmFolder\WinServer")) {
                                         [IO.Compression.ZipFile]::ExtractToDirectory($downloadedFile, $vmFolder)
@@ -179,7 +177,7 @@ Configuration Main {
                                         -VHDPath $destinationPath -Path $sqlVmVhdPath -Generation 2 -Switch "NAT Switch"
                                 Start-VM -Name $sqlVMName
                                 # Optional: Wait for VM to reach Running state
-                                Wait-VM -Name $sqlVMName -For Running -Timeout 300
+                                Wait-VM -Name $sqlVMName -For Running -Timeout 120
                         }
                 }
 
@@ -189,8 +187,6 @@ Configuration Main {
                         TestScript = { (Get-VM -Name "OnPremSQLVM" -ErrorAction SilentlyContinue).State -eq 'Running' }
                         SetScript  = {
                                 Write-Verbose "Configuring SQL VM..."
-                                $RepoOwner = "Tahubu-AI"
-                                $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
                                 $nestedWindowsUsername = "Administrator"
                                 $nestedWindowsPassword = "JS123!!"
                                 $secWindowsPassword = ConvertTo-SecureString $nestedWindowsPassword -AsPlainText -Force
@@ -198,7 +194,7 @@ Configuration Main {
 
                                 $sqlVMName = "OnPremSQLVM"
                                 $sqlConfigFileName = "sql-vm-config.ps1"
-                                $sqlConfigFile = "C:\git\$RepoName\Hands-on lab\resources\deployment\onprem\$sqlConfigFileName"
+                                $sqlConfigFile = "C:\git\$using:RepoName\Hands-on lab\resources\deployment\onprem\$sqlConfigFileName"
                                 $scriptPath = "C:\scripts"
 
                                 $session = New-PSSession -VMName $sqlVMName -Credential $winCreds -ErrorAction Stop
@@ -213,6 +209,5 @@ Configuration Main {
                                 Remove-PSSession $session
                         }
                 }
-#>
   	}
 }
