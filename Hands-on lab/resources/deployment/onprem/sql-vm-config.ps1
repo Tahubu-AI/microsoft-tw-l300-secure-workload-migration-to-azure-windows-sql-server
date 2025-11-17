@@ -13,6 +13,14 @@ param(
     [string] $repoName
 )
 
+$logPath = "C:\logs"
+
+if (-not (Test-Path $logPath)) {
+    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
+}
+
+Start-Transcript -Path "$logPath\sql-vm-config.log"
+
 Write-Host "Configuring SQL VM from repo $repoOwner/$repoName"
 
 # Ensure directories exist
@@ -154,3 +162,5 @@ if (-not ($fwRules -contains "SQL AG Load Balancer Probe Port")) {
 }
 
 Write-Host "=== SQL VM configuration complete ==="
+
+Stop-Transcript
