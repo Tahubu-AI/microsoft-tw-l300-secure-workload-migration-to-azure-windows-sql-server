@@ -57,10 +57,9 @@ var gitHubRepo = '${repositoryOwner}/${repositoryName}'
 var gitHubRepoScriptPath = 'Hands-on%20lab/resources/deployment/onprem'
 var gitHubRepoUrl = 'https://raw.githubusercontent.com/${gitHubRepo}/${repositoryBranch}/${gitHubRepoScriptPath}'
 
-var bootstrapSriptName = 'bootstrap.ps1'
-var bootstrapScriptUrl = '${gitHubRepoUrl}/${bootstrapSriptName}'
 var guestVmsScriptName = 'create-guest-vms.ps1'
-var guestVmsScriptUrl = '${gitHubRepoUrl}/${guestVmsScriptName}'
+var guestVmsScriptArchive = 'create-guest-vms.zip'
+var guestVmsArchiveUrl = '${gitHubRepoUrl}/${guestVmsScriptArchive}'
 var installHyperVScriptName = 'install-hyper-v.ps1'
 var installHyperVScriptUrl = '${gitHubRepoUrl}/${installHyperVScriptName}'
 var labUsername = 'demouser'
@@ -974,23 +973,47 @@ resource onprem_hyperv_vm 'Microsoft.Compute/virtualMachines@2021-07-01' = {
     }
 }
 
-resource onprem_hyperv_bootstrap 'Microsoft.Compute/virtualMachines/extensions@2021-03-01' = {
-  parent: onprem_hyperv_vm
-  name: 'BootstrapHyperV'
-  location: location
-  tags: tags
-  properties: {
-    publisher: 'Microsoft.Compute'
-    type: 'CustomScriptExtension'
-    typeHandlerVersion: '1.10'
-    autoUpgradeMinorVersion: true
-    settings: {
-      fileUris: [
-        installHyperVScriptUrl
-        guestVmsScriptUrl
-        bootstrapScriptUrl
-      ]
-      commandToExecute: 'powershell -ExecutionPolicy Bypass -File ./${bootstrapSriptName} -repoOwner ${repositoryOwner} -repoName ${repositoryName}'
+resource onprem_hyperv_vm_ext_installhyperv 'Microsoft.Compute/virtualMachines/extensions@2021-03-01' = {
+    parent: onprem_hyperv_vm
+    name: 'InstallHyperV'
+    location: location
+    tags: tags
+    properties: {
+        publisher: 'Microsoft.Compute'
+        type: 'CustomScriptExtension'
+        typeHandlerVersion: '1.10'
+        autoUpgradeMinorVersion: true
+        settings: {
+            fileUris: [
+                installHyperVScriptUrl
+            ]
+            commandToExecute: 'powershell -ExecutionPolicy Unrestricted -File ./${installHyperVScriptName}'
+        }
     }
-  }
+}
+
+resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2021-03-01' = {
+    parent: onprem_hyperv_vm
+    name: 'CreateGuestVMs'
+    location: location
+    tags: tags
+    dependsOn: [
+        onprem_hyperv_vm_ext_installhyperv
+    ]
+    properties: {
+        publisher: 'Microsoft.Powershell'
+        type: 'DSC'
+        typeHandlerVersion: '2.9'
+        autoUpgradeMinorVersion: true
+        settings: {
+            configuration: {
+                url: guestVmsArchiveUrl
+                script: guestVmsScriptName
+                function: 'Main'
+            }
+            // Custom parameters to be passed to the DSC configuration
+            repoOwner: repositoryOwner
+            repoName: repositoryName
+        }
+    }
 }

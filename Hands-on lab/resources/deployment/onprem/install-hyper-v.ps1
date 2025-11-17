@@ -14,8 +14,8 @@
 Write-Host "=== Starting Hyper-V installation script ==="
 
 # Set PowerShell Execution Policy
-#Write-Host "Setting PowerShell execution policy to Unrestricted..."
-#Set-ExecutionPolicy Unrestricted -Force
+Write-Host "Setting PowerShell execution policy to Unrestricted..."
+Set-ExecutionPolicy Unrestricted -Force
 
 # ###########################
 # Install Git

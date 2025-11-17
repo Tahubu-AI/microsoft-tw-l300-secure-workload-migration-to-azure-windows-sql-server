@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "3048704003233620929"
+      "templateHash": "9912444471876944584"
     }
   },
   "parameters": {
@@ -98,10 +98,9 @@
     "gitHubRepo": "[format('{0}/{1}', parameters('repositoryOwner'), parameters('repositoryName'))]",
     "gitHubRepoScriptPath": "Hands-on%20lab/resources/deployment/onprem",
     "gitHubRepoUrl": "[format('https://raw.githubusercontent.com/{0}/{1}/{2}', variables('gitHubRepo'), parameters('repositoryBranch'), variables('gitHubRepoScriptPath'))]",
-    "bootstrapSriptName": "bootstrap.ps1",
-    "bootstrapScriptUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('bootstrapSriptName'))]",
     "guestVmsScriptName": "create-guest-vms.ps1",
-    "guestVmsScriptUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('guestVmsScriptName'))]",
+    "guestVmsScriptArchive": "create-guest-vms.zip",
+    "guestVmsArchiveUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('guestVmsScriptArchive'))]",
     "installHyperVScriptName": "install-hyper-v.ps1",
     "installHyperVScriptUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('installHyperVScriptName'))]",
     "labUsername": "demouser",
@@ -1049,7 +1048,7 @@
     {
       "type": "Microsoft.Compute/virtualMachines/extensions",
       "apiVersion": "2021-03-01",
-      "name": "[format('{0}/{1}', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'BootstrapHyperV')]",
+      "name": "[format('{0}/{1}', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'InstallHyperV')]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
       "properties": {
@@ -1059,15 +1058,39 @@
         "autoUpgradeMinorVersion": true,
         "settings": {
           "fileUris": [
-            "[variables('installHyperVScriptUrl')]",
-            "[variables('guestVmsScriptUrl')]",
-            "[variables('bootstrapScriptUrl')]"
+            "[variables('installHyperVScriptUrl')]"
           ],
-          "commandToExecute": "[format('powershell -ExecutionPolicy Bypass -File ./{0} -repoOwner {1} -repoName {2}', variables('bootstrapSriptName'), parameters('repositoryOwner'), parameters('repositoryName'))]"
+          "commandToExecute": "[format('powershell -ExecutionPolicy Unrestricted -File ./{0}', variables('installHyperVScriptName'))]"
         }
       },
       "dependsOn": [
         "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "apiVersion": "2021-03-01",
+      "name": "[format('{0}/{1}', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'CreateGuestVMs')]",
+      "location": "[variables('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "publisher": "Microsoft.Powershell",
+        "type": "DSC",
+        "typeHandlerVersion": "2.9",
+        "autoUpgradeMinorVersion": true,
+        "settings": {
+          "configuration": {
+            "url": "[variables('guestVmsArchiveUrl')]",
+            "script": "[variables('guestVmsScriptName')]",
+            "function": "Main"
+          },
+          "repoOwner": "[parameters('repositoryOwner')]",
+          "repoName": "[parameters('repositoryName')]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')))]",
+        "[resourceId('Microsoft.Compute/virtualMachines/extensions', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'InstallHyperV')]"
       ]
     }
   ]
