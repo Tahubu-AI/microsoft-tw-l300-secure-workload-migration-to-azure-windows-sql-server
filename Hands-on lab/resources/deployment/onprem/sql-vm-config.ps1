@@ -9,8 +9,8 @@
 #>
 
 param(
-    [string] $repoOwner,
-    [string] $repoName
+    [string] $repoOwner = "Tahubu-AI",
+    [string] $repoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
 )
 
 $logPath = "C:\logs"
