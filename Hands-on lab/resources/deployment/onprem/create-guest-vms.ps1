@@ -13,24 +13,14 @@
 
 Configuration Main {
         Param (
-                [String]$RepoName,
-                [String]$RepoOwner
+                [String]$DbBackupFileUrl,
+                [String]$SqlConfigFileUrl,
+                [String]$SqlVmImageUrl,
+                [String]$WindowsVmImageUrl
         )
         Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
 	Node "localhost" {
-                Script EchoParams {
-                        GetScript  = { @{ Result = "ParamsEchoed" } }
-                        TestScript = { Test-Path "C:\logs\params.txt" }
-                        SetScript  = {
-                                $logPath = "C:\logs"
-                                if (-not (Test-Path $logPath)) {
-                                        New-Item -ItemType Directory -Path $logPath -Force | Out-Null
-                                }
-                                "Using parameters: RepoName:$using:RepoName, RepoOwner:$using:RepoOwner" | Out-File "$logPath\params.txt"
-                        }
-                }
-
                 # 1. Install DHCP role
                 Script InstallDHCP {
                         GetScript  = { @{ Result = (Get-WindowsFeature -Name DHCP).Installed } }
@@ -111,49 +101,43 @@ Configuration Main {
                         }
                 }
 
-                # 7. Clone Repo for VM Artifacts
-                Script CloneRepo {
-                        GetScript  = { @{ Result = (Test-Path "C:\git\$using:RepoName") } }
-                        TestScript = { Test-Path "C:\git\$using:RepoName" }
-                        SetScript  = {
-                                Write-Verbose "Cloning repo $using:RepoOwner/$using:RepoName..."
-
-                                $cloneDir = "C:\git"
-                                if (-not (Test-Path $cloneDir)) { New-Item -ItemType Directory -Path $cloneDir -Force }
-                                Set-Location $cloneDir
-                                if (-not (Test-Path "$cloneDir\$using:RepoName")) {
-                                        git lfs install --skip-smudge
-                                        git clone --quiet --single-branch "https://github.com/$using:RepoOwner/$using:RepoName.git"
-                                }
-                                if (Test-Path "$cloneDir\$using:RepoName\.git") {
-                                        Push-Location "$cloneDir\$using:RepoName"
-                                        git pull
-                                        git lfs pull
-                                        Pop-Location
-                                }
-                                else {
-                                        throw "Expected repo at $cloneDir\$using:RepoName but .git folder not found."
-                                }
-                        }
-                }
-
-                # 8. Create OnPrem Windows Server VM
+                # 7. Create OnPrem Windows Server VM
                 Script CreateOnPremVm {
                         GetScript  = { @{ Result = (Get-VM -Name "OnPremVM" -ErrorAction SilentlyContinue) } }
                         TestScript = { (Get-VM -Name "OnPremVM" -ErrorAction SilentlyContinue) -ne $null }
                         SetScript  = {
                                 Write-Verbose "Creating OnPrem Windows Server VM..."
-
                                 $vmFolder = "C:\VM"
                                 if (-not (Test-Path $vmFolder)) { New-Item -ItemType Directory -Path $vmFolder -Force }
-                                $downloadedFile = "C:\git\$using:RepoName\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
+
+                                $vmImageArchiveName = Split-Path $using:WindowsVmImageUrl -Leaf
+                                $vmImageArchivePath = "$vmFolder\$vmImageArchiveName"
+
+                                Write-Verbose "Downloading VM image from $using:WindowsVmImageUrl..."
+                                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                                if (-not (Test-Path "$vmImageArchivePath")) {
+                                        try {
+                                                Invoke-WebRequest -Uri $using:WindowsVmImageUrl -OutFile $vmImageArchivePath -ErrorAction Stop
+                                                Write-Verbose "VM image archive downloaded to $vmImageArchivePath"
+                                        } catch {
+                                                Write-Error "Failed to download VM image archive from $using:WindowsVmImageUrl"
+                                                exit 1
+                                        }
+                                } else {
+                                        Write-Verbose "Image archive already exists at $vmImageArchivePath"
+                                }
+
+                                Write-Verbose "Extracting VM image from $vmImageArchivePath to $vmFolder..."
                                 Add-Type -AssemblyName "System.IO.Compression.FileSystem"
                                 if (-not (Test-Path "$vmFolder\WinServer")) {
-                                        [IO.Compression.ZipFile]::ExtractToDirectory($downloadedFile, $vmFolder)
+                                        [IO.Compression.ZipFile]::ExtractToDirectory($vmImageArchivePath, $vmFolder)
                                 }
+
+                                Write-Verbose "Creating Windows VM..."
                                 New-VM -Name OnPremVM -MemoryStartupBytes 2GB -BootDevice VHD `
                                         -VHDPath "$vmFolder\WinServer\Virtual Hard Disks\WinServer.vhdx" `
                                         -Path "$vmFolder\WinServer\Virtual Hard Disks" -Generation 1 -Switch "NAT Switch"
+
                                 Start-VM -Name OnPremVM
                         }
                 }
@@ -167,17 +151,17 @@ Configuration Main {
                                 $sqlVMName = "OnPremSQLVM"
                                 $sqlVmVhdPath = "C:\VM\SQLServer"
                                 if (-not (Test-Path $sqlVmVhdPath)) { New-Item -ItemType Directory -Path $sqlVmVhdPath -Force }
-                                $vhdImageToDownload = "JSSQLStd19Base.vhdx"
-                                $sourceUrl = "https://jumpstartprodsg.blob.core.windows.net/scenarios/prod/$vhdImageToDownload"
-                                $destinationPath = "$sqlVmVhdPath\$vhdImageToDownload"
-                                if (-not (Test-Path $destinationPath)) {
-                                        Invoke-WebRequest -Uri $sourceUrl -OutFile $destinationPath -ErrorAction Stop
+                                $sqlImage = Split-Path $using:SqlVmImageUrl -Leaf                                
+                                $sqlVmImagePath = "$sqlVmVhdPath\$sqlImage"
+
+                                Write-Verbose "Downloading SQL VM image from $using:SqlVmImageUrl"
+                                if (-not (Test-Path $sqlVmImagePath)) {
+                                        Invoke-WebRequest -Uri $using:SqlVmImageUrl -OutFile $sqlVmImagePath -ErrorAction Stop
+                                        Write-Verbose "SQL VM image downloaded to $sqlVmImagePath"
                                 }
                                 New-VM -Name $sqlVMName -MemoryStartupBytes 2GB -BootDevice VHD `
-                                        -VHDPath $destinationPath -Path $sqlVmVhdPath -Generation 2 -Switch "NAT Switch"
+                                        -VHDPath $sqlVmImagePath -Path $sqlVmVhdPath -Generation 2 -Switch "NAT Switch"
                                 Start-VM -Name $sqlVMName
-                                # Optional: Wait for VM to reach Running state
-                                Wait-VM -Name $sqlVMName -For Running -Timeout 120
                         }
                 }
 
@@ -192,21 +176,35 @@ Configuration Main {
                                 $secWindowsPassword = ConvertTo-SecureString $nestedWindowsPassword -AsPlainText -Force
                                 $winCreds = New-Object System.Management.Automation.PSCredential ($nestedWindowsUsername, $secWindowsPassword)
 
-                                $sqlVMName = "OnPremSQLVM"
-                                $sqlConfigFileName = "sql-vm-config.ps1"
-                                $sqlConfigFile = "C:\git\$using:RepoName\Hands-on lab\resources\deployment\onprem\$sqlConfigFileName"
                                 $scriptPath = "C:\scripts"
+                                $sqlVMName = "OnPremSQLVM"
+                                $sqlConfigFileName = Split-Path $using:SqlConfigFileUrl -Leaf
+                                $sqlConfigFilePath = "$scriptPath\$sqlConfigFileName"
 
+                                # Wait for SQL VM to reach Running state
+                                Start-Sleep -Seconds 180
+
+                                # Download the config file
+                                Write-Verbose "Downloading SQL config file from $using:SqlConfigFileUrl"
+                                if (-not (Test-Path $sqlConfigFilePath)) {
+                                        Invoke-WebRequest -Uri $using:SqlConfigFileUrl -OutFile $sqlConfigFilePath -ErrorAction Stop
+                                        Write-Verbose "SQL config file downloaded to $sqlConfigFilePath"
+                                }
+
+                                Write-Verbose "Executing SQL config script on SQL Server VM..."
                                 $session = New-PSSession -VMName $sqlVMName -Credential $winCreds -ErrorAction Stop
                                 Invoke-Command -Session $session -ScriptBlock {
                                         New-Item -ItemType Directory -Path $using:scriptPath -Force | Out-Null
                                 }
-                                Copy-Item -Path $sqlConfigFile -Destination "$scriptPath\$sqlConfigFileName" -ToSession $session
+                                # Copy the SQL config script to the SQL VM
+                                Copy-Item -Path $sqlConfigFilePath -Destination "$sqlConfigFilePath" -ToSession $session
+
                                 Invoke-Command -Session $session -ScriptBlock {
-                                        powershell -ExecutionPolicy Bypass -File "$using:scriptPath\$using:sqlConfigFileName" `
-                                                -repoOwner $using:RepoOwner -repoName $using:RepoName
+                                        powershell -ExecutionPolicy Bypass -File "$using:sqlConfigFilePath" `
+                                                -DbBackupFileUrl $using:DbBackupFileUrl
                                 }
                                 Remove-PSSession $session
+                                Write-Verbose "Successfully executed SQL config script on SQL Server VM..."
                         }
                 }
   	}
