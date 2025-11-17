@@ -12,9 +12,9 @@
 #>
 
 Configuration Main {
-        param (
-                [string]$repoOwner,
-                [string]$repoName
+        param(
+                [string] $repoOwner = "Tahubu-AI",
+                [string] $repoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
         )
 
         Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
