@@ -19,9 +19,11 @@ if (-not (Test-Path $persistentDir)) { New-Item -ItemType Directory -Path $persi
 Copy-Item "$scriptDir\create-guest-vms.ps1" $persistentDir -Force
 
 # Build scheduled task to run create-guest-vms.ps1 at startup
-$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File $persistentDir\create-guest-vms.ps1 -repoOwner $repoOwner -repoName $repoName"
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File C:\startup-scripts\create-guest-vms.ps1 -repoOwner $repoOwner -repoName $repoName"
 $trigger = New-ScheduledTaskTrigger -AtStartup
-Register-ScheduledTask -TaskName "CreateGuestVMs" -Action $action -Trigger $trigger -RunLevel Highest -Force
+$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
+
+Register-ScheduledTask -TaskName "CreateGuestVMs" -Action $action -Trigger $trigger -Principal $principal -Force
 
 Write-Host "Scheduled task registered. Now starting Hyper-V installation..."
 
