@@ -11,6 +11,14 @@
  - Installs Hyper-V with all features and management tools, then restarts the machine
 #>
 
+$logPath = "C:\logs"
+
+if (-not (Test-Path $logPath)) {
+    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
+}
+
+Start-Transcript -Path "$logPath\install-hyper-v.log"
+
 Write-Host "=== Starting Hyper-V installation script ==="
 
 # Set PowerShell Execution Policy
@@ -89,3 +97,5 @@ Install-WindowsFeature -Name Hyper-V `
     -Restart
 
 Write-Host "=== Hyper-V installation script complete (system will restart) ==="
+
+Stop-Transcript

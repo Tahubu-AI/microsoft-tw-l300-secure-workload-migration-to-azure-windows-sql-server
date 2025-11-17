@@ -37,6 +37,19 @@ Configuration Main {
         Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
 	node "localhost" {
+                Script EchoParams {
+                        GetScript  = { @{ Result = "ParamsEchoed" } }
+                        TestScript = { Test-Path "C:\logs\params.txt" }
+                        SetScript  = {
+                                $logPath = "C:\logs"
+                                if (-not (Test-Path $logPath)) {
+                                New-Item -ItemType Directory -Path $logPath -Force | Out-Null
+                                }
+                                "repoOwner=$repoOwner; repoName=$repoName" | Out-File "$logPath\params.txt"
+                        }
+                }
+
+
                 # 1. Install DHCP role
                 Script InstallDHCP {
                         GetScript  = { @{ Result = (Get-WindowsFeature -Name DHCP).Installed } }
@@ -122,6 +135,7 @@ Configuration Main {
                         GetScript  = { @{ Result = (Test-Path "C:\git\$repoName") } }
                         TestScript = { Test-Path "C:\git\$repoName" }
                         SetScript  = {
+                                if (-not $repoName) { throw "Parameter repoName is null or empty." }
                                 Write-Verbose "Cloning repo $repoOwner/$repoName..."
                                 $cloneDir = "C:\git"
                                 if (-not (Test-Path $cloneDir)) { New-Item -ItemType Directory -Path $cloneDir -Force }
@@ -130,11 +144,16 @@ Configuration Main {
                                         git lfs install --skip-smudge
                                         git clone --quiet --single-branch "https://github.com/$repoOwner/$repoName.git"
                                 }
-                                Push-Location "$cloneDir\$repoName"
-                                git pull
-                                git lfs pull
-                                git lfs install --force
-                                Pop-Location
+                                if (Test-Path "$cloneDir\$repoName\.git") {
+                                        Push-Location "$cloneDir\$repoName"
+                                        git pull
+                                        git lfs pull
+                                        Pop-Location
+                                }
+                                else {
+                                        throw "Expected repo at $cloneDir\$repoName but .git folder not found."
+                                }
+
                         }
                 }
 
