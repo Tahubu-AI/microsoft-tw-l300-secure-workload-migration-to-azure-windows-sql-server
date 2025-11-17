@@ -11,6 +11,9 @@
  - Issues a Start Command for the new "OnPremVM"
 #>
 
+$Global:RepoOwner = 'Tahubu-AI'
+$Global:RepoName  = 'microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server'
+
 Configuration Main {
         param(
                 [string] $repoOwner = "Tahubu-AI",
@@ -28,7 +31,7 @@ Configuration Main {
                                 if (-not (Test-Path $logPath)) {
                                 New-Item -ItemType Directory -Path $logPath -Force | Out-Null
                                 }
-                                "repoOwner=$repoOwner; repoName=$repoName" | Out-File "$logPath\params.txt"
+                                "repoOwner=$Global:RepoOwner; repoName=$Global:RepoName" | Out-File "$logPath\params.txt"
                         }
                 }
 
@@ -114,26 +117,26 @@ Configuration Main {
 
                 # 7. Clone Repo for VM Artifacts
                 Script CloneRepo {
-                        GetScript  = { @{ Result = (Test-Path "C:\git\$repoName") } }
-                        TestScript = { Test-Path "C:\git\$repoName" }
+                        GetScript  = { @{ Result = (Test-Path "C:\git\$Global:RepoName") } }
+                        TestScript = { Test-Path "C:\git\$Global:RepoName" }
                         SetScript  = {
-                                if (-not $repoName) { throw "Parameter repoName is null or empty." }
-                                Write-Verbose "Cloning repo $repoOwner/$repoName..."
+                                if (-not $Global:RepoName) { throw "Parameter repoName is null or empty." }
+                                Write-Verbose "Cloning repo $Global:RepoOwner/$Global:RepoName..."
                                 $cloneDir = "C:\git"
                                 if (-not (Test-Path $cloneDir)) { New-Item -ItemType Directory -Path $cloneDir -Force }
                                 Set-Location $cloneDir
-                                if (-not (Test-Path "$cloneDir\$repoName")) {
+                                if (-not (Test-Path "$cloneDir\$Global:RepoName")) {
                                         git lfs install --skip-smudge
-                                        git clone --quiet --single-branch "https://github.com/$repoOwner/$repoName.git"
+                                        git clone --quiet --single-branch "https://github.com/$Global:RepoOwner/$Global:RepoName.git"
                                 }
-                                if (Test-Path "$cloneDir\$repoName\.git") {
-                                        Push-Location "$cloneDir\$repoName"
+                                if (Test-Path "$cloneDir\$Global:RepoName\.git") {
+                                        Push-Location "$cloneDir\$Global:RepoName"
                                         git pull
                                         git lfs pull
                                         Pop-Location
                                 }
                                 else {
-                                        throw "Expected repo at $cloneDir\$repoName but .git folder not found."
+                                        throw "Expected repo at $cloneDir\$Global:RepoName but .git folder not found."
                                 }
 
                         }
@@ -147,7 +150,7 @@ Configuration Main {
                                 Write-Verbose "Creating OnPrem Windows Server VM..."
                                 $vmFolder = "C:\VM"
                                 if (-not (Test-Path $vmFolder)) { New-Item -ItemType Directory -Path $vmFolder -Force }
-                                $downloadedFile = "C:\git\$repoName\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
+                                $downloadedFile = "C:\git\$Global:RepoName\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
                                 Add-Type -AssemblyName "System.IO.Compression.FileSystem"
                                 if (-not (Test-Path "$vmFolder\WinServer")) {
                                         [IO.Compression.ZipFile]::ExtractToDirectory($downloadedFile, $vmFolder)
@@ -195,7 +198,7 @@ Configuration Main {
 
                                 $sqlVMName = "OnPremSQLVM"
                                 $sqlConfigFileName = "sql-vm-config.ps1"
-                                $sqlConfigFile = "C:\git\$repoName\Hands-on lab\resources\deployment\onprem\$sqlConfigFileName"
+                                $sqlConfigFile = "C:\git\$Global:RepoName\Hands-on lab\resources\deployment\onprem\$sqlConfigFileName"
                                 $scriptPath = "C:\scripts"
 
                                 $session = New-PSSession -VMName $sqlVMName -Credential $winCreds -ErrorAction Stop
@@ -212,5 +215,3 @@ Configuration Main {
                 }
   	}
 }
-
-Main -repoOwner $repoOwner -repoName $repoName
