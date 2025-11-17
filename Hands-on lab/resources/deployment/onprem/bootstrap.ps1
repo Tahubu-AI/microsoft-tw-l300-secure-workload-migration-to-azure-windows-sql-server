@@ -20,7 +20,7 @@ Copy-Item "$scriptDir\create-guest-vms.ps1" $persistentDir -Force
 
 # Build scheduled task to run create-guest-vms.ps1 at startup
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File $persistentDir\create-guest-vms.ps1 -repoOwner $repoOwner -repoName $repoName"
-$trigger = New-ScheduledTaskTrigger -AtStartup -Delay (New-TimeSpan -Minutes 5)
+$trigger = New-ScheduledTaskTrigger -AtStartup
 Register-ScheduledTask -TaskName "CreateGuestVMs" -Action $action -Trigger $trigger -RunLevel Highest -Force
 
 Write-Host "Scheduled task registered. Now starting Hyper-V installation..."
