@@ -1011,9 +1011,16 @@ resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2
                 script: guestVmsScriptName
                 function: 'Main'
             }
-            // Custom parameters to be passed to the DSC configuration
+            configurationArguments: {
             repoOwner: repositoryOwner
             repoName: repositoryName
+            }
+            advancedOptions: {
+                rebootNodeIfNeeded: true
+            }
         }
     }
 }
+
+output repoName string = repositoryName
+output repoOwner string = repositoryOwner
