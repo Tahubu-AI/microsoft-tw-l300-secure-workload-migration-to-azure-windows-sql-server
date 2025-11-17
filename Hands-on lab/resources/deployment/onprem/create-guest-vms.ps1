@@ -23,12 +23,10 @@ Configuration Main {
                         TestScript = { Test-Path "C:\logs\params.txt" }
                         SetScript  = {
                                 $logPath = "C:\logs"
-                                $RepoOwner = "Tahubu-AI"
-                                $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
                                 if (-not (Test-Path $logPath)) {
                                         New-Item -ItemType Directory -Path $logPath -Force | Out-Null
                                 }
-                                "Using variables: repoOwner=$RepoOwner; repoName=$RepoName; RepositoryName:$RepositoryName" | Out-File "$logPath\params.txt"
+                                "Using variables: RepositoryName:$using:RepositoryName" | Out-File "$logPath\params.txt"
                         }
                 }
 <#
