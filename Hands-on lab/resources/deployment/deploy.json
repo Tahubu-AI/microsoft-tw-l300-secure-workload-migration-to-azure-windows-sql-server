@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "1195004075838024949"
+      "templateHash": "11582494212031689007"
     }
   },
   "parameters": {
@@ -1046,7 +1046,7 @@
     },
     {
       "type": "Microsoft.Compute/virtualMachines/extensions",
-      "apiVersion": "2017-12-01",
+      "apiVersion": "2021-03-01",
       "name": "[format('{0}/{1}', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'InstallHyperV')]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
@@ -1068,12 +1068,12 @@
     },
     {
       "type": "Microsoft.Compute/virtualMachines/extensions",
-      "apiVersion": "2017-12-01",
+      "apiVersion": "2021-03-01",
       "name": "[format('{0}/{1}', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'CreateGuestVMs')]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
       "properties": {
-        "publisher": "Microsoft.Powershell",
+        "publisher": "Microsoft.Compute",
         "type": "CustomScriptExtension",
         "typeHandlerVersion": "1.10",
         "autoUpgradeMinorVersion": true,

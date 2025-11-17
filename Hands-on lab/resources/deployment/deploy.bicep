@@ -973,7 +973,7 @@ resource onprem_hyperv_vm 'Microsoft.Compute/virtualMachines@2021-07-01' = {
     }
 }
 
-resource onprem_hyperv_vm_ext_installhyperv 'Microsoft.Compute/virtualMachines/extensions@2017-12-01' = {
+resource onprem_hyperv_vm_ext_installhyperv 'Microsoft.Compute/virtualMachines/extensions@2021-03-01' = {
     parent: onprem_hyperv_vm
     name: 'InstallHyperV'
     location: location
@@ -992,7 +992,7 @@ resource onprem_hyperv_vm_ext_installhyperv 'Microsoft.Compute/virtualMachines/e
     }
 }
 
-resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2017-12-01' = {
+resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2021-03-01' = {
     parent: onprem_hyperv_vm
     name: 'CreateGuestVMs'
     location: location
@@ -1001,7 +1001,7 @@ resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2
         onprem_hyperv_vm_ext_installhyperv
     ]
     properties: {
-        publisher: 'Microsoft.Powershell'
+        publisher: 'Microsoft.Compute'
         type: 'CustomScriptExtension'
         typeHandlerVersion: '1.10'
         autoUpgradeMinorVersion: true
