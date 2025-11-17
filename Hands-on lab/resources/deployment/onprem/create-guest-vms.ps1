@@ -49,7 +49,6 @@ Configuration Main {
                         }
                 }
 
-
                 # 1. Install DHCP role
                 Script InstallDHCP {
                         GetScript  = { @{ Result = (Get-WindowsFeature -Name DHCP).Installed } }
