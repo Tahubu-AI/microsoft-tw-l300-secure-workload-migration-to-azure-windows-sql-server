@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "11582494212031689007"
+      "templateHash": "13930581392312708074"
     }
   },
   "parameters": {
@@ -107,7 +107,8 @@
     "labPassword": "demo!pass123",
     "labSqlMIPassword": "demo!pass1234567",
     "tags": {
-      "purpose": "tech-workshop"
+      "purpose": "tech-workshop",
+      "createdBy": "[parameters('azureAdUserLogin')]"
     }
   },
   "resources": [
@@ -1047,7 +1048,7 @@
     {
       "type": "Microsoft.Compute/virtualMachines/extensions",
       "apiVersion": "2021-03-01",
-      "name": "[format('{0}/{1}', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'InstallHyperV')]",
+      "name": "[format('{0}/{1}', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'BootstrapHyperV')]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
       "properties": {
@@ -1057,36 +1058,14 @@
         "autoUpgradeMinorVersion": true,
         "settings": {
           "fileUris": [
-            "[variables('HyperVHostInstallHyperVURL')]"
+            "[variables('HyperVHostInstallHyperVURL')]",
+            "[variables('HyperVHostConfigURL')]"
           ],
-          "commandToExecute": "[format('powershell -ExecutionPolicy Unrestricted -File {0}/{1}', variables('HyperVHostInstallHyperVScriptFolder'), variables('HyperVHostInstallHyperVScriptFileName'))]"
+          "commandToExecute": "[format('powershell -ExecutionPolicy Bypass -File ./{0}; powershell -ExecutionPolicy Bypass -File  ./{1} -repoOwner {2} -repoName {3}', variables('HyperVHostInstallHyperVScriptFileName'), variables('HyperVHostGuestVmsScriptName'), parameters('repositoryOwner'), parameters('repositoryName'))]"
         }
       },
       "dependsOn": [
         "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')))]"
-      ]
-    },
-    {
-      "type": "Microsoft.Compute/virtualMachines/extensions",
-      "apiVersion": "2021-03-01",
-      "name": "[format('{0}/{1}', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'CreateGuestVMs')]",
-      "location": "[variables('location')]",
-      "tags": "[variables('tags')]",
-      "properties": {
-        "publisher": "Microsoft.Compute",
-        "type": "CustomScriptExtension",
-        "typeHandlerVersion": "1.10",
-        "autoUpgradeMinorVersion": true,
-        "settings": {
-          "fileUris": [
-            "[variables('HyperVHostConfigURL')]"
-          ],
-          "commandToExecute": "[format('powershell -ExecutionPolicy Bypass -File {0}', variables('HyperVHostGuestVmsScriptName'))]"
-        }
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')))]",
-        "[resourceId('Microsoft.Compute/virtualMachines/extensions', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'InstallHyperV')]"
       ]
     }
   ]

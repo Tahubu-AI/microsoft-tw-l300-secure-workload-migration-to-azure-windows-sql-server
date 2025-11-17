@@ -69,6 +69,7 @@ var labSqlMIPassword = 'demo!pass1234567'
 
 var tags = {
     purpose: 'tech-workshop'
+    createdBy: azureAdUserLogin
 }
 
 /* ****************************
@@ -973,44 +974,22 @@ resource onprem_hyperv_vm 'Microsoft.Compute/virtualMachines@2021-07-01' = {
     }
 }
 
-resource onprem_hyperv_vm_ext_installhyperv 'Microsoft.Compute/virtualMachines/extensions@2021-03-01' = {
-    parent: onprem_hyperv_vm
-    name: 'InstallHyperV'
-    location: location
-    tags: tags
-    properties: {
-        publisher: 'Microsoft.Compute'
-        type: 'CustomScriptExtension'
-        typeHandlerVersion: '1.10'
-        autoUpgradeMinorVersion: true
-        settings: {
-            fileUris: [
-                HyperVHostInstallHyperVURL
-            ]
-            commandToExecute: 'powershell -ExecutionPolicy Unrestricted -File ${HyperVHostInstallHyperVScriptFolder}/${HyperVHostInstallHyperVScriptFileName}'
-        }
+resource onprem_hyperv_bootstrap 'Microsoft.Compute/virtualMachines/extensions@2021-03-01' = {
+  parent: onprem_hyperv_vm
+  name: 'BootstrapHyperV'
+  location: location
+  tags: tags
+  properties: {
+    publisher: 'Microsoft.Compute'
+    type: 'CustomScriptExtension'
+    typeHandlerVersion: '1.10'
+    autoUpgradeMinorVersion: true
+    settings: {
+      fileUris: [
+        HyperVHostInstallHyperVURL
+        HyperVHostConfigURL
+      ]
+      commandToExecute: 'powershell -ExecutionPolicy Bypass -File ./${HyperVHostInstallHyperVScriptFileName}; powershell -ExecutionPolicy Bypass -File  ./${HyperVHostGuestVmsScriptName} -repoOwner ${repositoryOwner} -repoName ${repositoryName}'
     }
+  }
 }
-
-resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2021-03-01' = {
-    parent: onprem_hyperv_vm
-    name: 'CreateGuestVMs'
-    location: location
-    tags: tags
-    dependsOn: [
-        onprem_hyperv_vm_ext_installhyperv
-    ]
-    properties: {
-        publisher: 'Microsoft.Compute'
-        type: 'CustomScriptExtension'
-        typeHandlerVersion: '1.10'
-        autoUpgradeMinorVersion: true
-        settings: {
-            fileUris: [
-                HyperVHostConfigURL
-            ]
-            commandToExecute: 'powershell -ExecutionPolicy Bypass -File ${HyperVHostGuestVmsScriptName}'
-        }
-    }
-}
-
