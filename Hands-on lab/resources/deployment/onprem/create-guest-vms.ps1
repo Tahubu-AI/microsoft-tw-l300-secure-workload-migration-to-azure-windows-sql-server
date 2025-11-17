@@ -11,27 +11,22 @@
  - Issues a Start Command for the new "OnPremVM"
 #>
 
-$Global:RepoOwner = 'Tahubu-AI'
-$Global:RepoName  = 'microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server'
-
-Configuration Main {
-        param(
-                [string] $repoOwner = "Tahubu-AI",
-                [string] $repoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
-        )
-
+Configuration Main {        
         Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
-	node "localhost" {
-                Script EchoParams {
-                        GetScript  = { @{ Result = "ParamsEchoed" } }
-                        TestScript = { Test-Path "C:\logs\params.txt" }
+        [string] $RepoOwner = "Tahubu-AI",
+        [string] $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
+
+	Node "localhost" {
+                Script EchoVariables {
+                        GetScript  = { @{ Result = "VariablesEchoed" } }
+                        TestScript = { Test-Path "C:\logs\variables.txt" }
                         SetScript  = {
                                 $logPath = "C:\logs"
                                 if (-not (Test-Path $logPath)) {
-                                New-Item -ItemType Directory -Path $logPath -Force | Out-Null
+                                        New-Item -ItemType Directory -Path $logPath -Force | Out-Null
                                 }
-                                "repoOwner=$Global:RepoOwner; repoName=$Global:RepoName" | Out-File "$logPath\params.txt"
+                                "Using variables: repoOwner=$RepoOwner; repoName=$RepoName" | Out-File "$logPath\params.txt"
                         }
                 }
 
@@ -117,28 +112,27 @@ Configuration Main {
 
                 # 7. Clone Repo for VM Artifacts
                 Script CloneRepo {
-                        GetScript  = { @{ Result = (Test-Path "C:\git\$Global:RepoName") } }
-                        TestScript = { Test-Path "C:\git\$Global:RepoName" }
+                        GetScript  = { @{ Result = (Test-Path "C:\git\$RepoName") } }
+                        TestScript = { Test-Path "C:\git\$RepoName" }
                         SetScript  = {
-                                if (-not $Global:RepoName) { throw "Parameter repoName is null or empty." }
-                                Write-Verbose "Cloning repo $Global:RepoOwner/$Global:RepoName..."
+                                if (-not $RepoName) { throw "Parameter repoName is null or empty." }
+                                Write-Verbose "Cloning repo $RepoOwner/$RepoName..."
                                 $cloneDir = "C:\git"
                                 if (-not (Test-Path $cloneDir)) { New-Item -ItemType Directory -Path $cloneDir -Force }
                                 Set-Location $cloneDir
-                                if (-not (Test-Path "$cloneDir\$Global:RepoName")) {
+                                if (-not (Test-Path "$cloneDir\$RepoName")) {
                                         git lfs install --skip-smudge
-                                        git clone --quiet --single-branch "https://github.com/$Global:RepoOwner/$Global:RepoName.git"
+                                        git clone --quiet --single-branch "https://github.com/$RepoOwner/$RepoName.git"
                                 }
-                                if (Test-Path "$cloneDir\$Global:RepoName\.git") {
-                                        Push-Location "$cloneDir\$Global:RepoName"
+                                if (Test-Path "$cloneDir\$RepoName\.git") {
+                                        Push-Location "$cloneDir\$RepoName"
                                         git pull
                                         git lfs pull
                                         Pop-Location
                                 }
                                 else {
-                                        throw "Expected repo at $cloneDir\$Global:RepoName but .git folder not found."
+                                        throw "Expected repo at $cloneDir\$RepoName but .git folder not found."
                                 }
-
                         }
                 }
 
@@ -150,7 +144,7 @@ Configuration Main {
                                 Write-Verbose "Creating OnPrem Windows Server VM..."
                                 $vmFolder = "C:\VM"
                                 if (-not (Test-Path $vmFolder)) { New-Item -ItemType Directory -Path $vmFolder -Force }
-                                $downloadedFile = "C:\git\$Global:RepoName\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
+                                $downloadedFile = "C:\git\$RepoName\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
                                 Add-Type -AssemblyName "System.IO.Compression.FileSystem"
                                 if (-not (Test-Path "$vmFolder\WinServer")) {
                                         [IO.Compression.ZipFile]::ExtractToDirectory($downloadedFile, $vmFolder)
@@ -198,7 +192,7 @@ Configuration Main {
 
                                 $sqlVMName = "OnPremSQLVM"
                                 $sqlConfigFileName = "sql-vm-config.ps1"
-                                $sqlConfigFile = "C:\git\$Global:RepoName\Hands-on lab\resources\deployment\onprem\$sqlConfigFileName"
+                                $sqlConfigFile = "C:\git\$RepoName\Hands-on lab\resources\deployment\onprem\$sqlConfigFileName"
                                 $scriptPath = "C:\scripts"
 
                                 $session = New-PSSession -VMName $sqlVMName -Credential $winCreds -ErrorAction Stop
@@ -208,7 +202,7 @@ Configuration Main {
                                 Copy-Item -Path $sqlConfigFile -Destination "$scriptPath\$sqlConfigFileName" -ToSession $session
                                 Invoke-Command -Session $session -ScriptBlock {
                                         powershell -ExecutionPolicy Bypass -File "$using:scriptPath\$using:sqlConfigFileName" `
-                                                -repoOwner $using:repoOwner -repoName $using:repoName
+                                                -repoOwner $using:RepoOwner -repoName $using:RepoName
                                 }
                                 Remove-PSSession $session
                         }
