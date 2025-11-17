@@ -9,8 +9,7 @@
 #>
 
 param(
-    [string] $repoOwner = "Tahubu-AI",
-    [string] $repoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
+    [string]$DbBackupFileUrl
 )
 
 $logPath = "C:\logs"
@@ -21,7 +20,7 @@ if (-not (Test-Path $logPath)) {
 
 Start-Transcript -Path "$logPath\sql-vm-config.log"
 
-Write-Host "Configuring SQL VM from repo $repoOwner/$repoName"
+Write-Host "Configuring SQL VM..."
 
 # Ensure directories exist
 $logs = "C:\Logs"
@@ -75,17 +74,17 @@ Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "ALTER LOGIN s
 Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "ALTER LOGIN sa WITH PASSWORD = 'demo!pass123'"
 
 # Download database backup 
-$dbSource = "https://github.com/$repoOwner/$repoName/raw/main/Hands-on%20lab/resources/deployment/onprem/database.bak"
-$dbDestination = "C:\database.bak"
+$backupFileName = Split-Path $DbBackupFileUrl -Leaf
+$dbDestination = "C:\$backupFileName"
 
-Write-Host "Downloading WideWorldImporters backup from $dbSource..."
+Write-Host "Downloading WideWorldImporters backup from $DbBackupFileUrl..."
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 if (-not (Test-Path $dbDestination)) {
     try {
-        Invoke-WebRequest -Uri $dbSource -OutFile $dbDestination -ErrorAction Stop
+        Invoke-WebRequest -Uri $DbBackupFileUrl -OutFile $dbDestination -ErrorAction Stop
         Write-Host "Database backup downloaded to $dbDestination"
     } catch {
-        Write-Error "Failed to download WideWorldImporters backup from $dbSource"
+        Write-Error "Failed to download WideWorldImporters backup from $DbBackupFileUrl"
         exit 1
     }
 } else {
