@@ -3,25 +3,38 @@ param(
     [string]$repoName
 )
 
-Write-Host "Starting Hyper-V bootstrap..."
+$ErrorActionPreference = 'Stop'
+
+if (-not (Test-Path "C:\logs")) { New-Item -ItemType Directory -Path "C:\logs" }
+
+Start-Transcript -Path "C:\logs\bootstrap.log" -Append
+
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+
+Write-Host "Registering scheduled task for guest VM creation..."
+Write-Host "Using repo $repoOwner/$repoName..."
+
+$persistentDir = "C:\startup-scripts"
+if (-not (Test-Path $persistentDir)) { New-Item -ItemType Directory -Path $persistentDir }
+Copy-Item "$scriptDir\create-guest-vms.ps1" $persistentDir -Force
+
+# Build scheduled task to run create-guest-vms.ps1 at startup
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File $persistentDir\create-guest-vms.ps1 -repoOwner $repoOwner -repoName $repoName"
+$trigger = New-ScheduledTaskTrigger -AtStartup -Delay (New-TimeSpan -Minutes 5)
+Register-ScheduledTask -TaskName "CreateGuestVMs" -Action $action -Trigger $trigger -RunLevel Highest -Force
+
+Write-Host "Scheduled task registered. Now starting Hyper-V installation..."
 
 # Run install-hyper-v.ps1
 Write-Host "Installing Hyper-V..."
-.\install-hyper-v.ps1
+& "$scriptDir\install-hyper-v.ps1"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "install-hyper-v.ps1 failed with exit code $LASTEXITCODE"
+    Stop-Transcript
     exit $LASTEXITCODE
 }
 
-# Run create-guest-vms.ps1 with parameters
-Write-Host "Creating guest VMs..."
-.\create-guest-vms.ps1 -repoOwner $repoOwner -repoName $repoName
+Stop-Transcript
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "create-guest-vms.ps1 failed with exit code $LASTEXITCODE"
-    exit $LASTEXITCODE
-}
-
-Write-Host "Bootstrap completed successfully."
 exit 0

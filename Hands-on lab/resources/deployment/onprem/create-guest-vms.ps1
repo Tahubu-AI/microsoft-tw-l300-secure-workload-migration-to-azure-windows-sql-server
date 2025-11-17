@@ -171,4 +171,6 @@ Invoke-Command -Session $session -ScriptBlock {
 # Clean up session
 Remove-PSSession $session
 
+Unregister-ScheduledTask -TaskName "CreateGuestVMs" -Confirm:$false
+
 Write-Host "=== Giest VM configuration complete ==="
