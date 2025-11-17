@@ -18,6 +18,8 @@ param (
 
 Start-Sleep -Seconds 300 # wait 5 minutes
 
+Start-Transcript -Path "C:\logs\create-guest-vms.log" -Append
+
 Write-Host "Provisioning guest VMs from repo $repoOwner/$repoName..."
 
 # Ensure DHCP role is installed
@@ -122,6 +124,7 @@ if (-not (Test-Path $destinationPath)) {
                 Invoke-WebRequest -Uri $sourceUrl -OutFile $destinationPath -ErrorAction Stop
         } catch {
                 Write-Error "Failed to download SQL Server VHD image from $sourceUrl"
+                Stop-Transcript
                 exit 1
         }
 }
@@ -144,6 +147,7 @@ Wait-VM -Name $sqlVMName -For Running -Timeout $timeout
 
 if ((Get-VM -Name $sqlVMName).State -ne 'Running') {
         Write-Error "VM $sqlVMName did not reach 'Running' state within $timeout seconds."
+        Stop-Transcript
         exit 1
 }
 
@@ -176,3 +180,5 @@ Remove-PSSession $session
 Unregister-ScheduledTask -TaskName "CreateGuestVMs" -Confirm:$false
 
 Write-Host "=== Giest VM configuration complete ==="
+
+Stop-Transcript
