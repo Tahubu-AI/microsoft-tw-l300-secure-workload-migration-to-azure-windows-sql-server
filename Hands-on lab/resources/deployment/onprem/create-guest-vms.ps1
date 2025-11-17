@@ -14,8 +14,8 @@
 Configuration Main {        
         Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
-        [string] $RepoOwner = "Tahubu-AI",
-        [string] $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
+        $RepoOwner = "Tahubu-AI",
+        $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
 
 	Node "localhost" {
                 Script EchoVariables {
