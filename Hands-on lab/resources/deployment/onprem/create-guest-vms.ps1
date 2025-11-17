@@ -11,25 +11,27 @@
  - Issues a Start Command for the new "OnPremVM"
 #>
 
-Configuration Main {        
+Configuration Main {
+        Param (
+                [String]$RepositoryName
+        )
         Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
-        $RepoOwner = "Tahubu-AI"
-        $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
-
 	Node "localhost" {
-                Script EchoVariables {
-                        GetScript  = { @{ Result = "VariablesEchoed" } }
-                        TestScript = { Test-Path "C:\logs\variables.txt" }
+                Script EchoParams {
+                        GetScript  = { @{ Result = "ParamsEchoed" } }
+                        TestScript = { Test-Path "C:\logs\params.txt" }
                         SetScript  = {
                                 $logPath = "C:\logs"
+                                $RepoOwner = "Tahubu-AI"
+                                $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
                                 if (-not (Test-Path $logPath)) {
                                         New-Item -ItemType Directory -Path $logPath -Force | Out-Null
                                 }
-                                "Using variables: repoOwner=$RepoOwner; repoName=$RepoName" | Out-File "$logPath\params.txt"
+                                "Using variables: repoOwner=$RepoOwner; repoName=$RepoName; RepositoryName:$RepositoryName" | Out-File "$logPath\params.txt"
                         }
                 }
-
+<#
                 # 1. Install DHCP role
                 Script InstallDHCP {
                         GetScript  = { @{ Result = (Get-WindowsFeature -Name DHCP).Installed } }
@@ -115,8 +117,11 @@ Configuration Main {
                         GetScript  = { @{ Result = (Test-Path "C:\git\$RepoName") } }
                         TestScript = { Test-Path "C:\git\$RepoName" }
                         SetScript  = {
-                                if (-not $RepoName) { throw "Parameter repoName is null or empty." }
+                                $RepoOwner = "Tahubu-AI"
+                                $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
+
                                 Write-Verbose "Cloning repo $RepoOwner/$RepoName..."
+
                                 $cloneDir = "C:\git"
                                 if (-not (Test-Path $cloneDir)) { New-Item -ItemType Directory -Path $cloneDir -Force }
                                 Set-Location $cloneDir
@@ -142,6 +147,7 @@ Configuration Main {
                         TestScript = { (Get-VM -Name "OnPremVM" -ErrorAction SilentlyContinue) -ne $null }
                         SetScript  = {
                                 Write-Verbose "Creating OnPrem Windows Server VM..."
+                                $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
                                 $vmFolder = "C:\VM"
                                 if (-not (Test-Path $vmFolder)) { New-Item -ItemType Directory -Path $vmFolder -Force }
                                 $downloadedFile = "C:\git\$RepoName\Hands-on lab\resources\deployment\onprem\OnPremWinServerVM.zip"
@@ -185,6 +191,8 @@ Configuration Main {
                         TestScript = { (Get-VM -Name "OnPremSQLVM" -ErrorAction SilentlyContinue).State -eq 'Running' }
                         SetScript  = {
                                 Write-Verbose "Configuring SQL VM..."
+                                $RepoOwner = "Tahubu-AI"
+                                $RepoName = "microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server"
                                 $nestedWindowsUsername = "Administrator"
                                 $nestedWindowsPassword = "JS123!!"
                                 $secWindowsPassword = ConvertTo-SecureString $nestedWindowsPassword -AsPlainText -Force
@@ -207,5 +215,6 @@ Configuration Main {
                                 Remove-PSSession $session
                         }
                 }
+#>
   	}
 }
