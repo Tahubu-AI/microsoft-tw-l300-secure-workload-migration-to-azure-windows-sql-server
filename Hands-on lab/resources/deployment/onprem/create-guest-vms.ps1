@@ -16,6 +16,8 @@ param (
         [string]$repoName
 )
 
+Start-Sleep -Seconds 300 # wait 5 minutes
+
 Write-Host "Provisioning guest VMs from repo $repoOwner/$repoName..."
 
 # Ensure DHCP role is installed
