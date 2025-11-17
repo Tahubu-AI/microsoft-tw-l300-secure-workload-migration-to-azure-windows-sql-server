@@ -11,23 +11,6 @@
  - Issues a Start Command for the new "OnPremVM"
 #>
 
-# Define LCM settings
-[DSCLocalConfigurationManager()]
-Configuration LCMConfig {
-    Node "localhost" {
-        Settings {
-            RefreshMode = 'Push'                  # Configs are pushed via extension
-            ConfigurationMode = 'ApplyOnly'       # Apply once, don’t monitor continuously
-            RebootNodeIfNeeded = $true            # Allow DSC to reboot automatically
-            ActionAfterReboot = 'ContinueConfiguration' # Resume after reboot
-        }
-    }
-}
-
-# Compile and apply LCM settings
-LCMConfig
-Set-DscLocalConfigurationManager -Path .\LCMConfig
-
 Configuration Main {
         param (
                 [string]$repoOwner,
@@ -229,3 +212,5 @@ Configuration Main {
                 }
   	}
 }
+
+Main -repoOwner $repoOwner -repoName $repoName
