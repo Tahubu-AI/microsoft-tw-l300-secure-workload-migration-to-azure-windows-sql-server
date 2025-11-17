@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "13930581392312708074"
+      "templateHash": "3048704003233620929"
     }
   },
   "parameters": {
@@ -95,14 +95,15 @@
     "sqlmiPrefix": "[format('{0}-sqlmi', variables('resourceNameBase'))]",
     "sqlmiStorageName": "[format('{0}sqlmistor', variables('resourceNameBase'))]",
     "onpremHyperVHostVMNamePrefix": "[format('{0}-hyperv', variables('onpremNamePrefix'))]",
-    "GitHubRepo": "[format('{0}/{1}', parameters('repositoryOwner'), parameters('repositoryName'))]",
-    "GitHubRepoScriptPath": "Hands-on%20lab/resources/deployment/onprem",
-    "GitHubRepoUrl": "[format('https://raw.githubusercontent.com/{0}/{1}/{2}', variables('GitHubRepo'), parameters('repositoryBranch'), variables('GitHubRepoScriptPath'))]",
-    "HyperVHostGuestVmsScriptName": "create-guest-vms.ps1",
-    "HyperVHostConfigURL": "[format('{0}/{1}', variables('GitHubRepoUrl'), variables('HyperVHostGuestVmsScriptName'))]",
-    "HyperVHostInstallHyperVScriptFolder": ".",
-    "HyperVHostInstallHyperVScriptFileName": "install-hyper-v.ps1",
-    "HyperVHostInstallHyperVURL": "[format('{0}/{1}', variables('GitHubRepoUrl'), variables('HyperVHostInstallHyperVScriptFileName'))]",
+    "gitHubRepo": "[format('{0}/{1}', parameters('repositoryOwner'), parameters('repositoryName'))]",
+    "gitHubRepoScriptPath": "Hands-on%20lab/resources/deployment/onprem",
+    "gitHubRepoUrl": "[format('https://raw.githubusercontent.com/{0}/{1}/{2}', variables('gitHubRepo'), parameters('repositoryBranch'), variables('gitHubRepoScriptPath'))]",
+    "bootstrapSriptName": "bootstrap.ps1",
+    "bootstrapScriptUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('bootstrapSriptName'))]",
+    "guestVmsScriptName": "create-guest-vms.ps1",
+    "guestVmsScriptUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('guestVmsScriptName'))]",
+    "installHyperVScriptName": "install-hyper-v.ps1",
+    "installHyperVScriptUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('installHyperVScriptName'))]",
     "labUsername": "demouser",
     "labPassword": "demo!pass123",
     "labSqlMIPassword": "demo!pass1234567",
@@ -1058,10 +1059,11 @@
         "autoUpgradeMinorVersion": true,
         "settings": {
           "fileUris": [
-            "[variables('HyperVHostInstallHyperVURL')]",
-            "[variables('HyperVHostConfigURL')]"
+            "[variables('installHyperVScriptUrl')]",
+            "[variables('guestVmsScriptUrl')]",
+            "[variables('bootstrapScriptUrl')]"
           ],
-          "commandToExecute": "[format('powershell -ExecutionPolicy Bypass -File ./{0}; powershell -ExecutionPolicy Bypass -File  ./{1} -repoOwner {2} -repoName {3}', variables('HyperVHostInstallHyperVScriptFileName'), variables('HyperVHostGuestVmsScriptName'), parameters('repositoryOwner'), parameters('repositoryName'))]"
+          "commandToExecute": "[format('powershell -ExecutionPolicy Bypass -File ./{0} -repoOwner {1} -repoName {2}', variables('bootstrapSriptName'), parameters('repositoryOwner'), parameters('repositoryName'))]"
         }
       },
       "dependsOn": [
