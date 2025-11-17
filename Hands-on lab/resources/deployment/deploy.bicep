@@ -53,16 +53,16 @@ var sqlmiStorageName = '${resourceNameBase}sqlmistor'
 
 var onpremHyperVHostVMNamePrefix = '${onpremNamePrefix}-hyperv'
 
-var GitHubRepo = '${repositoryOwner}/${repositoryName}'
-var GitHubRepoScriptPath = 'Hands-on%20lab/resources/deployment/onprem'
-var GitHubRepoUrl = 'https://raw.githubusercontent.com/${GitHubRepo}/${repositoryBranch}/${GitHubRepoScriptPath}'
+var gitHubRepo = '${repositoryOwner}/${repositoryName}'
+var gitHubRepoScriptPath = 'Hands-on%20lab/resources/deployment/onprem'
+var gitHubRepoUrl = 'https://raw.githubusercontent.com/${gitHubRepo}/${repositoryBranch}/${gitHubRepoScriptPath}'
 
-//var HyperVHostConfigArchiveFileName = 'create-guest-vms.zip'
-var HyperVHostGuestVmsScriptName =  'create-guest-vms.ps1'
-var HyperVHostConfigURL = '${GitHubRepoUrl}/${HyperVHostGuestVmsScriptName}'
-var HyperVHostInstallHyperVScriptFolder = '.'
-var HyperVHostInstallHyperVScriptFileName = 'install-hyper-v.ps1'
-var HyperVHostInstallHyperVURL = '${GitHubRepoUrl}/${HyperVHostInstallHyperVScriptFileName}'
+var bootstrapSriptName = 'bootstrap.ps1'
+var bootstrapScriptUrl = '${gitHubRepoUrl}/${bootstrapSriptName}'
+var guestVmsScriptName = 'create-guest-vms.ps1'
+var guestVmsScriptUrl = '${gitHubRepoUrl}/${guestVmsScriptName}'
+var installHyperVScriptName = 'install-hyper-v.ps1'
+var installHyperVScriptUrl = '${gitHubRepoUrl}/${installHyperVScriptName}'
 var labUsername = 'demouser'
 var labPassword = 'demo!pass123'
 var labSqlMIPassword = 'demo!pass1234567'
@@ -986,10 +986,11 @@ resource onprem_hyperv_bootstrap 'Microsoft.Compute/virtualMachines/extensions@2
     autoUpgradeMinorVersion: true
     settings: {
       fileUris: [
-        HyperVHostInstallHyperVURL
-        HyperVHostConfigURL
+        installHyperVScriptUrl
+        guestVmsScriptUrl
+        bootstrapScriptUrl
       ]
-      commandToExecute: 'powershell -ExecutionPolicy Bypass -File ./${HyperVHostInstallHyperVScriptFileName}; powershell -ExecutionPolicy Bypass -File  ./${HyperVHostGuestVmsScriptName} -repoOwner ${repositoryOwner} -repoName ${repositoryName}'
+      commandToExecute: 'powershell -ExecutionPolicy Bypass -File ./${bootstrapSriptName} -repoOwner ${repositoryOwner} -repoName ${repositoryName}'
     }
   }
 }
