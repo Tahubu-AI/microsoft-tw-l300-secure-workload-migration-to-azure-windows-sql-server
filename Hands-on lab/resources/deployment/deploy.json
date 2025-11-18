@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "9912444471876944584"
+      "templateHash": "16317015702257936390"
     }
   },
   "parameters": {
@@ -51,7 +51,7 @@
     },
     "sqlmiVCores": {
       "type": "int",
-      "defaultValue": 8,
+      "defaultValue": 4,
       "allowedValues": [
         4,
         8
@@ -97,12 +97,20 @@
     "onpremHyperVHostVMNamePrefix": "[format('{0}-hyperv', variables('onpremNamePrefix'))]",
     "gitHubRepo": "[format('{0}/{1}', parameters('repositoryOwner'), parameters('repositoryName'))]",
     "gitHubRepoScriptPath": "Hands-on%20lab/resources/deployment/onprem",
-    "gitHubRepoUrl": "[format('https://raw.githubusercontent.com/{0}/{1}/{2}', variables('gitHubRepo'), parameters('repositoryBranch'), variables('gitHubRepoScriptPath'))]",
+    "gitHubRepoUrl": "[format('https://github.com/{0}/raw/refs/heads/{1}/{2}', variables('gitHubRepo'), parameters('repositoryBranch'), variables('gitHubRepoScriptPath'))]",
+    "databaseBackupFile": "database.bak",
+    "databaseBackupFileUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('databaseBackupFile'))]",
     "guestVmsScriptName": "create-guest-vms.ps1",
     "guestVmsScriptArchive": "create-guest-vms.zip",
     "guestVmsArchiveUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('guestVmsScriptArchive'))]",
     "installHyperVScriptName": "install-hyper-v.ps1",
     "installHyperVScriptUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('installHyperVScriptName'))]",
+    "sqlConfigScriptName": "sql-vm-config.ps1",
+    "sqlConfigScriptUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('sqlConfigScriptName'))]",
+    "sqlVmImageName": "JSSQLStd19Base.vhdx",
+    "sqlVmImageUrl": "[format('https://jumpstartprodsg.blob.core.windows.net/scenarios/prod/{0}', variables('sqlVmImageName'))]",
+    "windowsVmImageName": "OnPremWinServerVM.zip",
+    "windowsVmImageUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('windowsVmImageName'))]",
     "labUsername": "demouser",
     "labPassword": "demo!pass123",
     "labSqlMIPassword": "demo!pass1234567",
@@ -1079,13 +1087,18 @@
         "typeHandlerVersion": "2.9",
         "autoUpgradeMinorVersion": true,
         "settings": {
+          "wmfVersion": "latest",
           "configuration": {
             "url": "[variables('guestVmsArchiveUrl')]",
             "script": "[variables('guestVmsScriptName')]",
             "function": "Main"
           },
-          "repoOwner": "[parameters('repositoryOwner')]",
-          "repoName": "[parameters('repositoryName')]"
+          "configurationArguments": {
+            "DbBackupFileUrl": "[variables('databaseBackupFileUrl')]",
+            "SqlConfigFileUrl": "[variables('sqlConfigScriptUrl')]",
+            "SqlVmImageUrl": "[variables('sqlVmImageUrl')]",
+            "WindowsVmImageUrl": "[variables('windowsVmImageUrl')]"
+          }
         }
       },
       "dependsOn": [
