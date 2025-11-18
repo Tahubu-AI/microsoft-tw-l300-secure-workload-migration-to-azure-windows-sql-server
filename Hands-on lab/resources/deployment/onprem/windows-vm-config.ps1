@@ -56,22 +56,55 @@ Configuration ArcConnect {
             }
         }
 
-        # Disable Microsoft Edge sidebar
-        Registry DisableEdgeSidebar {
-            Key       = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
-            ValueName = 'HubsSidebarEnabled'
-            ValueData = 0
-            ValueType = 'Dword'
-            Ensure    = 'Present'
-        }
+        # Disable Microsoft Edge features
+        Script DisableEdgeFeatures {
+            GetScript = {
+                $EdgePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
 
-        # Disable Microsoft Edge first-run Welcome screen
-        Registry DisableEdgeFirstRun {
-            Key       = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
-            ValueName = 'HideFirstRunExperience'
-            ValueData = 1
-            ValueType = 'Dword'
-            Ensure    = 'Present'
+                if (Test-Path $EdgePolicyPath) {
+                    $props = Get-ItemProperty -Path $EdgePolicyPath -ErrorAction SilentlyContinue
+                    @{
+                        HideFirstRunExperience       = $props.HideFirstRunExperience
+                        DefaultBrowserSettingEnabled = $props.DefaultBrowserSettingEnabled
+                        HubsSidebarEnabled           = $props.HubsSidebarEnabled
+                    }
+                }
+                else {
+                    @{ Result = "Edge policy key not present" }
+                }
+            }
+            TestScript = {
+                $EdgePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
+
+                # If the key doesn't exist, we need to run SetScript
+                if (-not (Test-Path $EdgePolicyPath)) {
+                    return $false
+                }
+
+                $props = Get-ItemProperty -Path $EdgePolicyPath -ErrorAction SilentlyContinue
+
+                # Check if all desired values are already set
+                return (
+                    ($props.HideFirstRunExperience -eq 1) -and
+                    ($props.DefaultBrowserSettingEnabled -eq 0) -and
+                    ($props.HubsSidebarEnabled -eq 0)
+                )
+            }
+            SetScript = {
+                # Registry path for Edge policy
+                $EdgePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
+
+                # Create the key if it doesn't exist
+                if (-not (Test-Path $EdgePolicyPath)) {
+                    New-Item -Path $EdgePolicyPath -Force | Out-Null
+                }
+
+                Set-ItemProperty -Path $EdgePolicyPath -Name "HideFirstRunExperience" -Type DWord -Value 1
+                Set-ItemProperty -Path $EdgePolicyPath -Name "DefaultBrowserSettingEnabled" -Type DWord -Value 0
+                Set-ItemProperty -Path $EdgePolicyPath -Name "HubsSidebarEnabled" -Type DWord -Value 0
+
+                Write-Verbose "Microsoft Edge First Run Experience disabled successfully."
+            }
         }
 
         # Install Arc Connected Machine Module
