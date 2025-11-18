@@ -168,13 +168,29 @@ Configuration Main {
                 # 10. Configure SQL VM
 		Script ConfigureSqlVm {
                         GetScript  = { @{ Result = "SQLVMConfigured" } }
-                        TestScript = { (Get-VM -Name "OnPremSQLVM" -ErrorAction SilentlyContinue).State -eq 'Running' }
+                        TestScript = { 
+                                try {
+                                        $username = "Administrator"
+                                        $password = "JS123!!"
+                                        $secPass = ConvertTo-SecureString $password -AsPlainText -Force
+                                        $winCreds = New-Object System.Management.Automation.PSCredential ($username, $secPass)
+                                
+                                        $session = New-PSSession -VMName "OnPremSQLVM" -Credential $winCreds -ErrorAction Stop
+                                        $dbExists = Invoke-Command -Session $session -ScriptBlock {
+                                                $sql = "SELECT name FROM sys.databases WHERE name = 'WideWorldImporters'"
+                                                $result = Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -ErrorAction SilentlyContinue
+                                                $result -ne $null
+                                        }
+                                        Remove-PSSession $session
+                                        return $dbExists
+                                } catch { return $false }
+                        }
                         SetScript  = {
                                 Write-Verbose "Configuring SQL VM..."
-                                $nestedWindowsUsername = "Administrator"
-                                $nestedWindowsPassword = "JS123!!"
-                                $secWindowsPassword = ConvertTo-SecureString $nestedWindowsPassword -AsPlainText -Force
-                                $winCreds = New-Object System.Management.Automation.PSCredential ($nestedWindowsUsername, $secWindowsPassword)
+                                $vmUsername = "Administrator"
+                                $vmPassword = "JS123!!"
+                                $secPass = ConvertTo-SecureString $vmPassword -AsPlainText -Force
+                                $winCreds = New-Object System.Management.Automation.PSCredential ($vmUsername, $secPass)
 
                                 $scriptPath = "C:\scripts"
                                 $sqlVMName = "OnPremSQLVM"
