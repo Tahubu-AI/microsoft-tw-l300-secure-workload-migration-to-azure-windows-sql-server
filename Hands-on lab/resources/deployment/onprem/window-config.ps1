@@ -4,13 +4,13 @@
 Configuration ArcConnect {
     Param(
         [Parameter(Mandatory)]
-        [string]$ResourceGroupName,
+        [String]$ResourceGroupName,
 
         [Parameter(Mandatory)]
-        [string]$MachineName,
+        [String]$MachineName,
 
         [Parameter(Mandatory)]
-        [string]$Location
+        [String]$Location
     )
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 

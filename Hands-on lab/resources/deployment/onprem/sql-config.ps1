@@ -10,7 +10,8 @@
 
 Configuration Main {
     Param(
-        [string]$DbBackupFileUrl
+        [Parameter(Mandatory)]
+        [String]$DbBackupFileUrl
     )
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
@@ -144,21 +145,21 @@ Configuration Main {
 
         Script DownloadDbBackup {
             GetScript = {
-                $backupFileName = Split-Path $DbBackupFileUrl -Leaf
+                $backupFileName = Split-Path $using:DbBackupFileUrl -Leaf
                 $dbDestination = "C:\$backupFileName"
                 @{ Result = (Test-Path $dbDestination) }
             }
             TestScript = {
-                $backupFileName = Split-Path $DbBackupFileUrl -Leaf
+                $backupFileName = Split-Path $using:DbBackupFileUrl -Leaf
                 $dbDestination = "C:\$backupFileName"
                 Test-Path $dbDestination
             }
             SetScript = {
-                $backupFileName = Split-Path $DbBackupFileUrl -Leaf
+                $backupFileName = Split-Path $using:DbBackupFileUrl -Leaf
                 $dbDestination = "C:\$backupFileName"
-                Write-Verbose "Downloading database backup from $DbBackupFileUrl..."
+                Write-Verbose "Downloading database backup from $using:DbBackupFileUrl..."
                 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                Invoke-WebRequest -Uri $DbBackupFileUrl -OutFile $dbDestination -ErrorAction Stop
+                Invoke-WebRequest -Uri $using:DbBackupFileUrl -OutFile $dbDestination -ErrorAction Stop
             }
         }
 
@@ -176,7 +177,7 @@ Configuration Main {
                 $dbExists.Count -gt 0
             }
             SetScript = {
-                $backupFileName = Split-Path $DbBackupFileUrl -Leaf
+                $backupFileName = Split-Path $using:DbBackupFileUrl -Leaf
                 $dbDestination = "C:\$backupFileName"
                 Write-Verbose "Restoring ToyStore database..."
                 $files = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
@@ -213,7 +214,7 @@ Configuration Main {
                 $dbExists.Count -gt 0
             }
             SetScript = {
-                $backupFileName = Split-Path $DbBackupFileUrl -Leaf
+                $backupFileName = Split-Path $using:DbBackupFileUrl -Leaf
                 $dbDestination = "C:\$backupFileName"
                 Write-Verbose "Restoring Customer360 database..."
                 $files = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
