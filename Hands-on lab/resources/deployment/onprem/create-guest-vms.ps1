@@ -168,23 +168,7 @@ Configuration Main {
                 # 10. Configure SQL VM
 		Script ConfigureSqlVm {
                         GetScript  = { @{ Result = "SQLVMConfigured" } }
-                        TestScript = { 
-                                try {
-                                        $username = "Administrator"
-                                        $password = "JS123!!"
-                                        $secPass = ConvertTo-SecureString $password -AsPlainText -Force
-                                        $winCreds = New-Object System.Management.Automation.PSCredential ($username, $secPass)
-                                
-                                        $session = New-PSSession -VMName "OnPremSQLVM" -Credential $winCreds -ErrorAction Stop
-                                        $dbExists = Invoke-Command -Session $session -ScriptBlock {
-                                                $sql = "SELECT name FROM sys.databases WHERE name = 'WideWorldImporters'"
-                                                $result = Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -ErrorAction SilentlyContinue
-                                                $result -ne $null
-                                        }
-                                        Remove-PSSession $session
-                                        return $dbExists
-                                } catch { return $false }
-                        }
+                        TestScript = { return $false }
                         SetScript  = {
                                 Write-Verbose "Configuring SQL VM..."
                                 $vmUsername = "Administrator"
@@ -193,6 +177,8 @@ Configuration Main {
                                 $winCreds = New-Object System.Management.Automation.PSCredential ($vmUsername, $secPass)
 
                                 $scriptPath = "C:\scripts"
+                                if (-not (Test-Path $scriptPath)) { New-Item -ItemType Directory -Path $scriptPath -Force }
+
                                 $sqlVMName = "OnPremSQLVM"
                                 $sqlConfigFileName = Split-Path $using:SqlConfigFileUrl -Leaf
                                 $sqlConfigFilePath = "$scriptPath\$sqlConfigFileName"
@@ -209,18 +195,34 @@ Configuration Main {
 
                                 Write-Verbose "Executing SQL config script on SQL Server VM..."
                                 $session = New-PSSession -VMName $sqlVMName -Credential $winCreds -ErrorAction Stop
+
                                 Invoke-Command -Session $session -ScriptBlock {
                                         New-Item -ItemType Directory -Path $using:scriptPath -Force | Out-Null
                                 }
                                 # Copy the SQL config script to the SQL VM
                                 Copy-Item -Path $sqlConfigFilePath -Destination "$sqlConfigFilePath" -ToSession $session
 
-                                Invoke-Command -Session $session -ScriptBlock {
-                                        powershell -ExecutionPolicy Bypass -File "$using:sqlConfigFilePath" `
-                                                -DbBackupFileUrl $using:DbBackupFileUrl
+                                $dbExists = Invoke-Command -Session $session -ScriptBlock {
+                                        try {
+                                                $sql = "SELECT name FROM sys.databases WHERE name = 'WideWorldImporters'"
+                                                $result = Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -ErrorAction SilentlyContinue
+                                                $result -ne $null
+                                        } catch { $false }
                                 }
+
+                                if (-not $dbExists) {
+                                        Write-Verbose "Database not found, running SQL config script..."
+                                        Invoke-Command -Session $session -ScriptBlock {
+                                                powershell -ExecutionPolicy Bypass -File "$using:sqlConfigFilePath" `
+                                                        -DbBackupFileUrl $using:DbBackupFileUrl
+                                        }
+                                } else {
+                                        Write-Verbose "Database already exists, skipping install."
+                                }
+                                
                                 Remove-PSSession $session
-                                Write-Verbose "Successfully executed SQL config script on SQL Server VM..."
+
+                                Write-Verbose "Successfully executed SQL config script on SQL Server VM."
                         }
                 }
   	}
