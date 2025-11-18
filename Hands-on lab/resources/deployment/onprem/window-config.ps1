@@ -15,7 +15,7 @@ Configuration ArcConnect {
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
     Node "localhost" {
-        # 1. Set environment variable to override the ARC on an Azure VM installation
+        # Set environment variable to override the ARC on an Azure VM installation
         Script SetArcTestEnvVar {
             GetScript = {
                 $val = [System.Environment]::GetEnvironmentVariable("MSFT_ARC_TEST",'Machine')
@@ -30,7 +30,7 @@ Configuration ArcConnect {
             }
         }
 
-        # 2. Disable Windows Azure guest agent to allow Azure Arc Service connection installation
+        # Disable Windows Azure guest agent to allow Azure Arc Service connection installation
         Service DisableGuestAgent {
             DependsOn  = '[Script]SetArcTestEnvVar'
             Name = 'WindowsAzureGuestAgent'
@@ -38,6 +38,43 @@ Configuration ArcConnect {
             State = 'Stopped'
         }
 
+        # Disable the Server Manager from starting on login
+        Script DisableServerManager {
+            SetScript = {
+                # Disable the Server Manager scheduled task
+                Get-ScheduledTask -TaskName 'ServerManager' | Disable-ScheduledTask
+            }
+            TestScript = {
+                # Check if the task is already disabled
+                $task = Get-ScheduledTask -TaskName 'ServerManager'
+                return ($task.State -eq 'Disabled')
+            }
+            GetScript = {
+                # Return current state for reporting
+                $task = Get-ScheduledTask -TaskName 'ServerManager'
+                @{ Result = $task.State }
+            }
+        }
+
+        # Disable Microsoft Edge sidebar
+        Registry DisableEdgeSidebar {
+            Key       = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+            ValueName = 'HubsSidebarEnabled'
+            ValueData = 0
+            ValueType = 'Dword'
+            Ensure    = 'Present'
+        }
+
+        # Disable Microsoft Edge first-run Welcome screen
+        Registry DisableEdgeFirstRun {
+            Key       = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+            ValueName = 'HideFirstRunExperience'
+            ValueData = 1
+            ValueType = 'Dword'
+            Ensure    = 'Present'
+        }
+
+        # Install Arc Connected Machine Module
         Script InstallConnectedMachineModule {
             DependsOn = '[Service]DisableGuestAgent'
             GetScript = {
@@ -58,6 +95,7 @@ Configuration ArcConnect {
             }
         }
 
+        # Connect the machine to Azure Arc
         Script ConnectArcMachine {
             DependsOn = '[Script]InstallConnectedMachineModule'
             GetScript = {

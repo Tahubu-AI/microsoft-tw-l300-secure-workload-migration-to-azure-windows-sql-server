@@ -16,7 +16,7 @@ Configuration Main {
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
     Node "localhost" {
-        # 1. Set environment variable to override the ARC on an Azure VM installation
+        # Set environment variable to override the ARC on an Azure VM installation
         Script SetArcTestEnvVar {
             GetScript = {
                 $val = [System.Environment]::GetEnvironmentVariable("MSFT_ARC_TEST",'Machine')
@@ -31,7 +31,7 @@ Configuration Main {
             }
         }
 
-        # 2. Disable Windows Azure guest agent to allow Azure Arc Service connection installation
+        # Disable Windows Azure guest agent to allow Azure Arc Service connection installation
         Service DisableGuestAgent {
             DependsOn = '[Script]SetArcTestEnvVar'
             Name  = 'WindowsAzureGuestAgent'
@@ -39,7 +39,43 @@ Configuration Main {
             State = 'Stopped'
         }
 
-        # 2. Ensure directories exist
+        # Disable the Server Manager from starting on login
+        Script DisableServerManager {
+            SetScript = {
+                # Disable the Server Manager scheduled task
+                Get-ScheduledTask -TaskName 'ServerManager' | Disable-ScheduledTask
+            }
+            TestScript = {
+                # Check if the task is already disabled
+                $task = Get-ScheduledTask -TaskName 'ServerManager'
+                return ($task.State -eq 'Disabled')
+            }
+            GetScript = {
+                # Return current state for reporting
+                $task = Get-ScheduledTask -TaskName 'ServerManager'
+                @{ Result = $task.State }
+            }
+        }
+
+        # Disable Microsoft Edge sidebar
+        Registry DisableEdgeSidebar {
+            Key       = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+            ValueName = 'HubsSidebarEnabled'
+            ValueData = 0
+            ValueType = 'Dword'
+            Ensure    = 'Present'
+        }
+
+        # Disable Microsoft Edge first-run Welcome screen
+        Registry DisableEdgeFirstRun {
+            Key       = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+            ValueName = 'HideFirstRunExperience'
+            ValueData = 1
+            ValueType = 'Dword'
+            Ensure    = 'Present'
+        }
+
+        # Ensure directories exist
         foreach ($dirName in @('Logs','Data','Backup')) {
             File ("${dirName}_Directory") {
                 Ensure          = 'Present'
@@ -48,7 +84,7 @@ Configuration Main {
             }
         }
 
-        # 4. Load SQL modules
+        # Load SQL modules
         Script LoadSqlModules {
             GetScript = {
                 # Report whether the module is loaded
@@ -87,7 +123,7 @@ Configuration Main {
             }
         }
 
-        # 3. Enable TCP protocol
+        # Enable TCP protocol
         Script EnableSqlTcp {
             DependsOn = '[Script]LoadSqlModules'
             GetScript = { @{ Result = "SqlTcp" } }
@@ -116,6 +152,7 @@ Configuration Main {
             State       = 'Running'
         }
 
+        # Restart SQL Server service
         Script RestartSqlAfterConfig {
             DependsOn = '[Script]ConfigureSqlDefaults','[Script]EnableSqlTcp'
             GetScript  = { @{ Result = "RestartNeeded" } }
@@ -126,6 +163,7 @@ Configuration Main {
             }
         }
 
+        # Configure SA account
         Script ConfigureSqlSaAccount {
             DependsOn = '[Service]SqlService','[Script]RestartSqlAfterConfig'
             GetScript = {
@@ -143,6 +181,7 @@ Configuration Main {
             }
         }
 
+        # Download database backup
         Script DownloadDbBackup {
             GetScript = {
                 $backupFileName = Split-Path $using:DbBackupFileUrl -Leaf
@@ -163,7 +202,7 @@ Configuration Main {
             }
         }
 
-        # Restore ToyStore
+        # Restore ToyStore database
         Script RestoreToyStore {
             DependsOn = '[Script]DownloadDbBackup'
             GetScript = {
@@ -201,6 +240,7 @@ Configuration Main {
             }
         }
 
+        # Restore Customer360 database
         Script RestoreCustomer360 {
             DependsOn = '[Script]DownloadDbBackup'
             GetScript = {
@@ -238,6 +278,7 @@ Configuration Main {
             }
         }
 
+        # Add built-in admins to SQL databases
         Script AddBuiltinAdmins {
             DependsOn = '[Script]RestoreCustomer360','[Script]RestoreToyStore'
             GetScript = {
@@ -263,6 +304,7 @@ Configuration Main {
             }
         }
 
+        # Set FULL recovery mode on ToyStore database
         Script ConfigureRecoveryModel {
             DependsOn = '[Script]RestoreToyStore'
             GetScript = {
@@ -272,7 +314,7 @@ Configuration Main {
             }
             TestScript = {
                 $model = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
-                    SELECT recovery_model_desc FROM sys.databases WHERE name = 'Toys'"
+                    SELECT recovery_model_desc FROM sys.databases WHERE name = 'ToyStore'"
                 $model.recovery_model_desc -eq 'FULL'
             }
             SetScript = {
@@ -283,7 +325,7 @@ Configuration Main {
             }
         }
 
-        # 3. AddFirewallRules
+        # AddFirewallRules
         Script AddFirewallRules {
             GetScript = { @{ Result = "FirewallRulesAdded" } }
             TestScript = { return $false}
