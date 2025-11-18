@@ -12,7 +12,7 @@ param(
     [string]$DbBackupFileUrl
 )
 
-$logPath = "C:\logs"
+$logPath = "C:\script-logs"
 
 if (-not (Test-Path $logPath)) {
     New-Item -ItemType Directory -Path $logPath -Force | Out-Null

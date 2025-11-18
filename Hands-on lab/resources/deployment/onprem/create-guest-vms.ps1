@@ -166,7 +166,7 @@ Configuration Main {
                 }
 
                 # 10. Configure SQL VM
-		Script ConfigureSqlVm {
+		        Script ConfigureSqlVm {
                         GetScript  = { @{ Result = "SQLVMConfigured" } }
                         TestScript = { return $false }
                         SetScript  = {
@@ -176,31 +176,33 @@ Configuration Main {
                                 $secPass = ConvertTo-SecureString $vmPassword -AsPlainText -Force
                                 $winCreds = New-Object System.Management.Automation.PSCredential ($vmUsername, $secPass)
 
-                                $scriptPath = "C:\scripts"
-                                if (-not (Test-Path $scriptPath)) { New-Item -ItemType Directory -Path $scriptPath -Force }
+                                if (-not (Test-Path "C:\scripts")) { New-Item -ItemType Directory -Path "C:\scripts" -Force }
 
                                 $sqlVMName = "OnPremSQLVM"
                                 $sqlConfigFileName = Split-Path $using:SqlConfigFileUrl -Leaf
-                                $sqlConfigFilePath = "$scriptPath\$sqlConfigFileName"
+                                $sqlConfigFileLocal = "C:\scripts\$sqlConfigFileName"
+                                $sqlConfigFileRemote = "C:\scripts\$sqlConfigFileName"
 
                                 # Wait for SQL VM to reach Running state
-                                Start-Sleep -Seconds 180
+                                #Start-Sleep -Seconds 180
 
-                                # Download the config file
-                                Write-Verbose "Downloading SQL config file from $using:SqlConfigFileUrl"
-                                if (-not (Test-Path $sqlConfigFilePath)) {
-                                        Invoke-WebRequest -Uri $using:SqlConfigFileUrl -OutFile $sqlConfigFilePath -ErrorAction Stop
-                                        Write-Verbose "SQL config file downloaded to $sqlConfigFilePath"
+                                # Download the config file, if necessary
+                                if (-not (Test-Path $sqlConfigFileLocal)) {
+                                        Write-Verbose "Downloading SQL config file from $using:SqlConfigFileUrl"
+                                        Invoke-WebRequest -Uri $using:SqlConfigFileUrl -OutFile $sqlConfigFileLocal -ErrorAction Stop
+                                        Write-Verbose "SQL config file downloaded to $sqlConfigFileLocal"
                                 }
 
-                                Write-Verbose "Executing SQL config script on SQL Server VM..."
                                 $session = New-PSSession -VMName $sqlVMName -Credential $winCreds -ErrorAction Stop
 
                                 Invoke-Command -Session $session -ScriptBlock {
-                                        New-Item -ItemType Directory -Path $using:scriptPath -Force | Out-Null
+                                        Write-Verbose "Creating 'C:\scripts' directory on $sqlVMName..."
+                                        New-Item -ItemType Directory -Path "C:\scripts" -Force | Out-Null
                                 }
+
                                 # Copy the SQL config script to the SQL VM
-                                Copy-Item -Path $sqlConfigFilePath -Destination "$sqlConfigFilePath" -ToSession $session
+                                Write-Verbose "Copying $sqlConfigFileName to $sqlConfigFileRemote on $sqlVNMame..."
+                                Copy-Item -Path $sqlConfigFileLocal -Destination "$sqlConfigFileRemote" -ToSession $session
 
                                 $dbExists = Invoke-Command -Session $session -ScriptBlock {
                                         Write-Verbose "Checking SQL VM for existence of WideWorldImporters database..."
@@ -212,11 +214,12 @@ Configuration Main {
                                 }
 
                                 if (-not $dbExists) {
-                                        Write-Verbose "Database not found, running SQL config script..."
+                                        Write-Verbose "Database not found, running $sqlConfigFileRemote script on $sqlVMName"
                                         Invoke-Command -Session $session -ScriptBlock {
-                                                powershell -ExecutionPolicy Bypass -File "$using:sqlConfigFilePath" `
-                                                        -DbBackupFileUrl $using:DbBackupFileUrl
-                                        }
+                                            param($remotePath, $backupUrl)
+                                            Write-Verbose "Running $remotePath with backup $backupUrl"
+                                            powershell -ExecutionPolicy Bypass -File $remotePath -DbBackupFileUrl $backupUrl
+                                        } -ArgumentList $sqlConfigFileRemote, $DbBackupFileUrl
                                 } else {
                                         Write-Verbose "Database already exists, skipping install."
                                 }
