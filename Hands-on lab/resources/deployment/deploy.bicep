@@ -30,7 +30,7 @@ param sqlmiSku string = 'GP_Gen5'
     4
     8
 ])
-param sqlmiVCores int = 8
+param sqlmiVCores int = 4
 
 @description('The branch of the GitHub repository to use for deployment scripts.')
 param repositoryBranch string = 'main'
@@ -55,13 +55,26 @@ var onpremHyperVHostVMNamePrefix = '${onpremNamePrefix}-hyperv'
 
 var gitHubRepo = '${repositoryOwner}/${repositoryName}'
 var gitHubRepoScriptPath = 'Hands-on%20lab/resources/deployment/onprem'
-var gitHubRepoUrl = 'https://raw.githubusercontent.com/${gitHubRepo}/${repositoryBranch}/${gitHubRepoScriptPath}'
+var gitHubRepoUrl = 'https://github.com/${gitHubRepo}/raw/refs/heads/${repositoryBranch}/${gitHubRepoScriptPath}'
+
+var databaseBackupFile = 'database.bak'
+var databaseBackupFileUrl = '${gitHubRepoUrl}/${databaseBackupFile}'
 
 var guestVmsScriptName = 'create-guest-vms.ps1'
 var guestVmsScriptArchive = 'create-guest-vms.zip'
 var guestVmsArchiveUrl = '${gitHubRepoUrl}/${guestVmsScriptArchive}'
+
 var installHyperVScriptName = 'install-hyper-v.ps1'
 var installHyperVScriptUrl = '${gitHubRepoUrl}/${installHyperVScriptName}'
+
+var sqlConfigScriptName = 'sql-vm-config.ps1'
+var sqlConfigScriptUrl = '${gitHubRepoUrl}/${sqlConfigScriptName}'
+var sqlVmImageName = 'JSSQLStd19Base.vhdx'
+var sqlVmImageUrl = 'https://jumpstartprodsg.blob.core.windows.net/scenarios/prod/${sqlVmImageName}'
+
+var windowsVmImageName = 'OnPremWinServerVM.zip'
+var windowsVmImageUrl = '${gitHubRepoUrl}/${windowsVmImageName}'
+
 var labUsername = 'demouser'
 var labPassword = 'demo!pass123'
 var labSqlMIPassword = 'demo!pass1234567'
@@ -1006,21 +1019,18 @@ resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2
         typeHandlerVersion: '2.9'
         autoUpgradeMinorVersion: true
         settings: {
+            wmfVersion: 'latest'
             configuration: {
                 url: guestVmsArchiveUrl
                 script: guestVmsScriptName
                 function: 'Main'
             }
             configurationArguments: {
-            repoOwner: repositoryOwner
-            repoName: repositoryName
-            }
-            advancedOptions: {
-                rebootNodeIfNeeded: true
+                DbBackupFileUrl: databaseBackupFileUrl
+                SqlConfigFileUrl: sqlConfigScriptUrl
+                SqlVmImageUrl: sqlVmImageUrl
+                WindowsVmImageUrl: windowsVmImageUrl
             }
         }
     }
 }
-
-output repoName string = repositoryName
-output repoOwner string = repositoryOwner
