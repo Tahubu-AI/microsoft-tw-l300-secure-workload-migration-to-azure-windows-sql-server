@@ -203,6 +203,7 @@ Configuration Main {
                                 Copy-Item -Path $sqlConfigFilePath -Destination "$sqlConfigFilePath" -ToSession $session
 
                                 $dbExists = Invoke-Command -Session $session -ScriptBlock {
+                                        Write-Verbose "Checking SQL VM for existence of WideWorldImporters database..."
                                         try {
                                                 $sql = "SELECT name FROM sys.databases WHERE name = 'WideWorldImporters'"
                                                 $result = Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -ErrorAction SilentlyContinue
