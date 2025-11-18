@@ -2,7 +2,7 @@
  What does this script do?
 	- Creates Backup, Data and Logs directories
 	- Sets SQL Configs: Directories made as defaults, Enables TCP, Eables Mixed Authentication SA Account
-	- Downloads the WideWorldImporters Database as a Backup Device, then Restores the Database
+	- Downloads the Customer360 Database as a Backup Device, then Restores the Database
 	- Adds the Domain Built-In Administrators to the SYSADMIN group
 	- Changes to Recovery type of the DB to "Full Recovery" and then performs a Backup to meet the requirements of AOG
 	- Opens three Firewall ports in support of the AOG:  1433 (default SQL), 5022 (HADR Listener), 59999 (Internal Loadbalacer Probe)
@@ -156,81 +156,81 @@ Configuration Main {
             SetScript = {
                 $backupFileName = Split-Path $DbBackupFileUrl -Leaf
                 $dbDestination = "C:\$backupFileName"
-                Write-Verbose "Downloading WideWorldImporters backup from $DbBackupFileUrl..."
+                Write-Verbose "Downloading database backup from $DbBackupFileUrl..."
                 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
                 Invoke-WebRequest -Uri $DbBackupFileUrl -OutFile $dbDestination -ErrorAction Stop
             }
         }
 
-        # Restore TailspinToys
-        Script RestoreTailspinToys {
+        # Restore ToyStore
+        Script RestoreToyStore {
             DependsOn = '[Script]DownloadDbBackup'
             GetScript = {
                 $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
-                    SELECT name FROM sys.databases WHERE name = 'TailspinToys'"
+                    SELECT name FROM sys.databases WHERE name = 'ToyStore'"
                 @{ Result = $dbExists }
             }
             TestScript = {
                 $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
-                    SELECT name FROM sys.databases WHERE name = 'TailspinToys'"
+                    SELECT name FROM sys.databases WHERE name = 'ToyStore'"
                 $dbExists.Count -gt 0
             }
             SetScript = {
                 $backupFileName = Split-Path $DbBackupFileUrl -Leaf
                 $dbDestination = "C:\$backupFileName"
-                Write-Verbose "Restoring TailspinToys database..."
+                Write-Verbose "Restoring ToyStore database..."
                 $files = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
                     RESTORE FILELISTONLY FROM DISK = '$dbDestination'"
                 $relocateFiles = @()
                 foreach ($file in $files) {
                     if ($file.Type -eq 'D') {
                         $relocateFiles += New-Object Microsoft.SqlServer.Management.Smo.RelocateFile(
-                            $file.LogicalName, "C:\Database\Data\TailspinToys.mdf")
+                            $file.LogicalName, "C:\Database\Data\ToyStore.mdf")
                     }
                     elseif ($file.Type -eq 'L') {
                         $relocateFiles += New-Object Microsoft.SqlServer.Management.Smo.RelocateFile(
-                            $file.LogicalName, "C:\Database\Logs\TailspinToys.ldf")
+                            $file.LogicalName, "C:\Database\Logs\ToyStore.ldf")
                     }
                 }
                 Restore-SqlDatabase -ServerInstance Localhost `
-                    -Database TailspinToys `
+                    -Database ToyStore `
                     -BackupFile $dbDestination `
                     -RelocateFile $relocateFiles `
                     -ReplaceDatabase -Verbose
             }
         }
 
-        Script RestoreWideWorldImporters {
+        Script RestoreCustomer360 {
             DependsOn = '[Script]DownloadDbBackup'
             GetScript = {
                 $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
-                    SELECT name FROM sys.databases WHERE name = 'WideWorldImporters'"
+                    SELECT name FROM sys.databases WHERE name = 'Customer360'"
                 @{ Result = $dbExists }
             }
             TestScript = {
                 $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
-                    SELECT name FROM sys.databases WHERE name = 'WideWorldImporters'"
+                    SELECT name FROM sys.databases WHERE name = 'Customer360'"
                 $dbExists.Count -gt 0
             }
             SetScript = {
                 $backupFileName = Split-Path $DbBackupFileUrl -Leaf
                 $dbDestination = "C:\$backupFileName"
-                Write-Verbose "Restoring WideWorldImporters database..."
+                Write-Verbose "Restoring Customer360 database..."
                 $files = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
                     RESTORE FILELISTONLY FROM DISK = '$dbDestination'"
                 $relocateFiles = @()
                 foreach ($file in $files) {
                     if ($file.Type -eq 'D') {
                         $relocateFiles += New-Object Microsoft.SqlServer.Management.Smo.RelocateFile(
-                            $file.LogicalName, "C:\Database\Data\WideWorldImporters.mdf")
+                            $file.LogicalName, "C:\Database\Data\Customer360.mdf")
                     }
                     elseif ($file.Type -eq 'L') {
                         $relocateFiles += New-Object Microsoft.SqlServer.Management.Smo.RelocateFile(
-                            $file.LogicalName, "C:\Database\Logs\WideWorldImporters.ldf")
+                            $file.LogicalName, "C:\Database\Logs\Customer360.ldf")
                     }
                 }
                 Restore-SqlDatabase -ServerInstance Localhost `
-                    -Database WideWorldImporters `
+                    -Database Customer360 `
                     -BackupFile $dbDestination `
                     -RelocateFile $relocateFiles `
                     -ReplaceDatabase -Verbose
@@ -238,7 +238,7 @@ Configuration Main {
         }
 
         Script AddBuiltinAdmins {
-            DependsOn = '[Script]RestoreWideWorldImporters','[Script]RestoreTailspinToys'
+            DependsOn = '[Script]RestoreCustomer360','[Script]RestoreToyStore'
             GetScript = {
                 $loginExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
                     SELECT name FROM sys.server_principals WHERE name = 'BUILTIN\Administrators'"
@@ -263,10 +263,10 @@ Configuration Main {
         }
 
         Script ConfigureRecoveryModel {
-            DependsOn = '[Script]RestoreTailspinToys'
+            DependsOn = '[Script]RestoreToyStore'
             GetScript = {
                 $model = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
-                    SELECT recovery_model_desc FROM sys.databases WHERE name = 'TailspinToys'"
+                    SELECT recovery_model_desc FROM sys.databases WHERE name = 'ToyStore'"
                 @{ Result = $model }
             }
             TestScript = {
@@ -275,10 +275,10 @@ Configuration Main {
                 $model.recovery_model_desc -eq 'FULL'
             }
             SetScript = {
-                Write-Verbose "Setting TailspinToys recovery model to FULL and running backup..."
+                Write-Verbose "Setting ToyStore recovery model to FULL and running backup..."
                 Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "
-                    ALTER DATABASE TailspinToys SET RECOVERY FULL"
-                Backup-SqlDatabase -ServerInstance Localhost -Database TailspinToys
+                    ALTER DATABASE ToyStore SET RECOVERY FULL"
+                Backup-SqlDatabase -ServerInstance Localhost -Database ToyStore
             }
         }
 
