@@ -173,7 +173,7 @@ Stop-Transcript
 
                     Write-Verbose "Creating scheduled task to run Arc onboarding payload..."
                     $taskAction    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
-                    $taskTrigger   = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
+                    $taskTrigger   = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2)
                     $taskPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
                     $taskSettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
