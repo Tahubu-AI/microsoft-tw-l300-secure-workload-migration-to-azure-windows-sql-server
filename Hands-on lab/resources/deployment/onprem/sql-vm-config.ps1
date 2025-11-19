@@ -16,29 +16,6 @@ Configuration Main {
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
     Node "localhost" {
-        # Set environment variable to override the ARC on an Azure VM installation
-        Script SetArcTestEnvVar {
-            GetScript = {
-                $val = [System.Environment]::GetEnvironmentVariable("MSFT_ARC_TEST",'Machine')
-                @{ Result = $val }
-            }
-            TestScript = {
-                [System.Environment]::GetEnvironmentVariable("MSFT_ARC_TEST",'Machine') -eq 'true'
-            }
-            SetScript = {
-                Write-Verbose "Setting MSFT_ARC_TEST environment variable..."
-                [System.Environment]::SetEnvironmentVariable("MSFT_ARC_TEST",'true',[System.EnvironmentVariableTarget]::Machine)
-            }
-        }
-
-        # Disable Windows Azure guest agent to allow Azure Arc Service connection installation
-        Service DisableGuestAgent {
-            DependsOn = '[Script]SetArcTestEnvVar'
-            Name  = 'WindowsAzureGuestAgent'
-            StartupType = 'Disabled'
-            State = 'Stopped'
-        }
-
         # Disable the Server Manager from starting on login
         Script DisableServerManager {
             GetScript = {
@@ -388,5 +365,57 @@ Configuration Main {
                 }
             }
         }
+
+        # Set environment variable to override the ARC on an Azure VM installation
+        Script SetArcTestEnvVar {
+            GetScript = {
+                $val = [System.Environment]::GetEnvironmentVariable("MSFT_ARC_TEST",'Machine')
+                @{ Result = $val }
+            }
+            TestScript = {
+                [System.Environment]::GetEnvironmentVariable("MSFT_ARC_TEST",'Machine') -eq 'true'
+            }
+            SetScript = {
+                Write-Verbose "Setting MSFT_ARC_TEST environment variable..."
+                [System.Environment]::SetEnvironmentVariable("MSFT_ARC_TEST",'true',[System.EnvironmentVariableTarget]::Machine)
+            }
+        }
+
+        # Disable Windows Azure guest agent to allow Azure Arc installation
+        Script ScheduleDisableGuestAgent {
+            DependsOn = '[Script]SetArcTestEnvVar'
+            GetScript = {
+                $task = Get-ScheduledTask -TaskName 'DisableGuestAgentAfterDSC' -ErrorAction SilentlyContinue
+                if ($null -ne $task) { @{ Result = "Scheduled" } } else { @{ Result = "NotScheduled" } }
+            }
+            TestScript = {
+                $task = Get-ScheduledTask -TaskName 'DisableGuestAgentAfterDSC' -ErrorAction SilentlyContinue
+                return ($null -ne $task)
+            }
+            SetScript = {
+                Write-Verbose "Creating scheduled task to disable WindowsAzureGuestAgent after DSC completes..."
+
+                $scriptPath = "C:\ArcPrep\DisableGuestAgent.ps1"
+                @"
+Stop-Service WindowsAzureGuestAgent -Force -ErrorAction SilentlyContinue
+Set-Service WindowsAzureGuestAgent -StartupType Disabled
+schtasks /Delete /TN 'DisableGuestAgentAfterDSC' /F | Out-Null
+"@ | Set-Content -Path $scriptPath -Encoding UTF8
+
+                $taskAction    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+                $taskTrigger   = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2)
+                $taskPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
+                $taskSettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+
+                Register-ScheduledTask -TaskName 'DisableGuestAgentAfterDSC' `
+                    -Action $taskAction `
+                    -Trigger $taskTrigger `
+                    -Principal $taskPrincipal `
+                    -Settings $taskSettings -Force | Out-Null
+
+                Write-Verbose "Scheduled task created. Guest Agent will be disabled and task will self-delete."
+            }
+        }
+
     }
 }
