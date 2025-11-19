@@ -9,20 +9,20 @@ has_children: true
 
 ## Lab Scenario
 
-Tailspin Toys depends on mission-critical analytics and order systems that must never go down. To accommodate this requirement, they want to securely and efficiently migrate their SQL Server workloads to Azure, ensuring business continuity and meeting demanding recovery targets.
+Tailspin Toys relies on mission‑critical analytics and order processing systems that must remain continuously available. Any downtime directly impacts revenue, customer satisfaction, and supply chain operations. To modernize their data estate while meeting strict recovery objectives, Tailspin has chosen to migrate their on‑premises SQL Server workloads to Azure SQL Managed Instance using Azure Arc MI‑Link.
 
-In this exercise, you will migrate Tailspin's on-premises SQL Server database to Azure SQL Managed Instance via Azure Arc MI-Link.
+This hybrid approach allows Tailspin to extend Azure management and disaster recovery capabilities to their existing SQL Server environment, ensuring a secure, low‑risk migration path. In this lab, you will step into the role of Tailspin’s cloud architect, guiding the migration of their on‑premises database to Azure while validating rollback, failback, and high availability strategies.
 
 ## Objectives
 
-After you complete this lab, you will be able to:
+After completing this lab, you will be able to:
 
-- Arc-enable and connect an on-premises SQL Server instance to Azure
-- Implement MI-Link for hybrid replication and failover
-- Execute rollback and failback strategies
-- Upgrade to the latest compatible SQL Server and configure HA/DR
-- Enable advanced capabilities for modern data workloads
+- Arc-enable an on-premises SQL Server instance and establish connectivity with Azure.
+- Configure and validate MI‑Link to replicate databases to Azure SQL Managed Instance for hybrid continuity.
+- Perform migration operations including cutover, rollback, and failback to ensure business resilience.
+- Upgrade SQL Server to the latest supported version and configure high availability/disaster recovery (HA/DR).
+- Leverage Azure capabilities such as monitoring, security, and performance optimization for modern data workloads.
 
 ## Lab Duration
 
-- **Estimated Time:** 75 minutes
+- **Estimated Time:** 45 minutes

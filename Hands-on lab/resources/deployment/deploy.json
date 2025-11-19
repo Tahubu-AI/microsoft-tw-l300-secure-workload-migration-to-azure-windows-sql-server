@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "16317015702257936390"
+      "templateHash": "565988859145774184"
     }
   },
   "parameters": {
@@ -38,7 +38,7 @@
         "description": "The VM size for the virtual machines. Allows Intel and AMD 4-core options with premium and non-premium storage."
       }
     },
-    "sqlmiSku": {
+    "sqlMiSku": {
       "type": "string",
       "defaultValue": "GP_Gen5",
       "allowedValues": [
@@ -49,7 +49,7 @@
         "description": "The SKU of the SQL Managed Instance."
       }
     },
-    "sqlmiVCores": {
+    "sqlMiVCores": {
       "type": "int",
       "defaultValue": 4,
       "allowedValues": [
@@ -89,31 +89,27 @@
   "variables": {
     "resourceNameBase": "[format('tailspin{0}', take(uniqueString(resourceGroup().id), 7))]",
     "location": "[resourceGroup().location]",
-    "onpremNamePrefix": "[format('{0}-onprem', variables('resourceNameBase'))]",
     "hubNamePrefix": "[format('{0}-hub', variables('resourceNameBase'))]",
     "spokeNamePrefix": "[format('{0}-spoke', variables('resourceNameBase'))]",
-    "sqlmiPrefix": "[format('{0}-sqlmi', variables('resourceNameBase'))]",
-    "sqlmiStorageName": "[format('{0}sqlmistor', variables('resourceNameBase'))]",
-    "onpremHyperVHostVMNamePrefix": "[format('{0}-hyperv', variables('onpremNamePrefix'))]",
+    "sqlMiPrefix": "[format('{0}-sqlmi', variables('resourceNameBase'))]",
+    "sqlMiStorageName": "[format('{0}sqlmistor', variables('resourceNameBase'))]",
+    "onPremPrefix": "[format('{0}-onprem', variables('resourceNameBase'))]",
+    "onPremSqlVmPrefix": "[format('{0}-sql', variables('onPremPrefix'))]",
+    "onPremWindowsVmPrefix": "[format('{0}-win', variables('onPremPrefix'))]",
     "gitHubRepo": "[format('{0}/{1}', parameters('repositoryOwner'), parameters('repositoryName'))]",
     "gitHubRepoScriptPath": "Hands-on%20lab/resources/deployment/onprem",
     "gitHubRepoUrl": "[format('https://github.com/{0}/raw/refs/heads/{1}/{2}', variables('gitHubRepo'), parameters('repositoryBranch'), variables('gitHubRepoScriptPath'))]",
     "databaseBackupFile": "database.bak",
     "databaseBackupFileUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('databaseBackupFile'))]",
-    "guestVmsScriptName": "create-guest-vms.ps1",
-    "guestVmsScriptArchive": "create-guest-vms.zip",
-    "guestVmsArchiveUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('guestVmsScriptArchive'))]",
-    "installHyperVScriptName": "install-hyper-v.ps1",
-    "installHyperVScriptUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('installHyperVScriptName'))]",
-    "sqlConfigScriptName": "sql-vm-config.ps1",
-    "sqlConfigScriptUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('sqlConfigScriptName'))]",
-    "sqlVmImageName": "JSSQLStd19Base.vhdx",
-    "sqlVmImageUrl": "[format('https://jumpstartprodsg.blob.core.windows.net/scenarios/prod/{0}', variables('sqlVmImageName'))]",
-    "windowsVmImageName": "OnPremWinServerVM.zip",
-    "windowsVmImageUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('windowsVmImageName'))]",
+    "sqlVmScriptName": "sql-vm-config.ps1",
+    "sqlVmScriptArchive": "sql-vm-config.zip",
+    "sqlVmScriptArchiveUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('sqlVmScriptArchive'))]",
+    "windowsVmScriptName": "windows-vm-config.ps1",
+    "windowsVmScriptArchive": "windows-vm-config.zip",
+    "windowsVmScriptArchiveUrl": "[format('{0}/{1}', variables('gitHubRepoUrl'), variables('windowsVmScriptArchive'))]",
     "labUsername": "demouser",
     "labPassword": "demo!pass123",
-    "labSqlMIPassword": "demo!pass1234567",
+    "labSqlMiPassword": "demo!pass1234567",
     "tags": {
       "purpose": "tech-workshop",
       "createdBy": "[parameters('azureAdUserLogin')]"
@@ -122,8 +118,8 @@
   "resources": [
     {
       "type": "Microsoft.Network/virtualNetworks",
-      "apiVersion": "2020-11-01",
-      "name": "[format('{0}-vnet', variables('onpremNamePrefix'))]",
+      "apiVersion": "2025-01-01",
+      "name": "[format('{0}-vnet', variables('onPremPrefix'))]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
       "properties": {
@@ -144,7 +140,7 @@
     },
     {
       "type": "Microsoft.Network/virtualNetworks",
-      "apiVersion": "2020-11-01",
+      "apiVersion": "2025-01-01",
       "name": "[format('{0}-vnet', variables('hubNamePrefix'))]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
@@ -172,7 +168,7 @@
     },
     {
       "type": "Microsoft.Network/virtualNetworks",
-      "apiVersion": "2020-11-01",
+      "apiVersion": "2025-01-01",
       "name": "[format('{0}-vnet', variables('spokeNamePrefix'))]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
@@ -190,18 +186,18 @@
             }
           },
           {
-            "name": "AzureSQLMI",
+            "name": "AzureSqlMI",
             "properties": {
               "addressPrefix": "10.2.1.0/24",
               "networkSecurityGroup": {
-                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', variables('sqlmiPrefix')))]"
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', variables('sqlMiPrefix')))]"
               },
               "routeTable": {
-                "id": "[resourceId('Microsoft.Network/routeTables', format('{0}-rt', variables('sqlmiPrefix')))]"
+                "id": "[resourceId('Microsoft.Network/routeTables', format('{0}-rt', variables('sqlMiPrefix')))]"
               },
               "delegations": [
                 {
-                  "name": "AzureSQLMI",
+                  "name": "AzureSqlMI",
                   "properties": {
                     "serviceName": "Microsoft.Sql/managedInstances"
                   },
@@ -213,67 +209,52 @@
         ]
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', variables('sqlmiPrefix')))]",
-        "[resourceId('Microsoft.Network/routeTables', format('{0}-rt', variables('sqlmiPrefix')))]"
+        "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', variables('sqlMiPrefix')))]",
+        "[resourceId('Microsoft.Network/routeTables', format('{0}-rt', variables('sqlMiPrefix')))]"
       ]
     },
     {
       "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-      "apiVersion": "2020-11-01",
+      "apiVersion": "2025-01-01",
       "name": "[format('{0}/{1}', format('{0}-vnet', variables('hubNamePrefix')), 'hub-onprem')]",
       "properties": {
         "remoteVirtualNetwork": {
-          "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onpremNamePrefix')))]"
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]"
         },
         "allowVirtualNetworkAccess": true,
-        "allowForwardedTraffic": true,
-        "remoteAddressSpace": {
-          "addressPrefixes": [
-            "10.0.0.0/16"
-          ]
-        }
+        "allowForwardedTraffic": true
       },
       "dependsOn": [
         "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('hubNamePrefix')))]",
-        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onpremNamePrefix')))]"
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]"
       ]
     },
     {
       "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-      "apiVersion": "2020-11-01",
-      "name": "[format('{0}/{1}', format('{0}-vnet', variables('onpremNamePrefix')), 'onprem-hub')]",
+      "apiVersion": "2025-01-01",
+      "name": "[format('{0}/{1}', format('{0}-vnet', variables('onPremPrefix')), 'onprem-hub')]",
       "properties": {
         "remoteVirtualNetwork": {
           "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('hubNamePrefix')))]"
         },
         "allowVirtualNetworkAccess": true,
-        "allowForwardedTraffic": true,
-        "remoteAddressSpace": {
-          "addressPrefixes": [
-            "10.1.0.0/16"
-          ]
-        }
+        "allowForwardedTraffic": true
       },
       "dependsOn": [
         "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('hubNamePrefix')))]",
-        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onpremNamePrefix')))]"
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]"
       ]
     },
     {
       "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-      "apiVersion": "2020-11-01",
+      "apiVersion": "2025-01-01",
       "name": "[format('{0}/{1}', format('{0}-vnet', variables('spokeNamePrefix')), 'spoke-hub')]",
       "properties": {
         "remoteVirtualNetwork": {
           "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('hubNamePrefix')))]"
         },
         "allowVirtualNetworkAccess": true,
-        "allowForwardedTraffic": true,
-        "remoteAddressSpace": {
-          "addressPrefixes": [
-            "10.1.0.0/16"
-          ]
-        }
+        "allowForwardedTraffic": true
       },
       "dependsOn": [
         "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('hubNamePrefix')))]",
@@ -282,19 +263,14 @@
     },
     {
       "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-      "apiVersion": "2020-11-01",
+      "apiVersion": "2025-01-01",
       "name": "[format('{0}/{1}', format('{0}-vnet', variables('hubNamePrefix')), 'hub-spoke')]",
       "properties": {
         "remoteVirtualNetwork": {
           "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix')))]"
         },
         "allowVirtualNetworkAccess": true,
-        "allowForwardedTraffic": true,
-        "remoteAddressSpace": {
-          "addressPrefixes": [
-            "10.2.0.0/16"
-          ]
-        }
+        "allowForwardedTraffic": true
       },
       "dependsOn": [
         "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('hubNamePrefix')))]",
@@ -303,8 +279,8 @@
     },
     {
       "type": "Microsoft.Storage/storageAccounts",
-      "apiVersion": "2022-05-01",
-      "name": "[variables('sqlmiStorageName')]",
+      "apiVersion": "2025-06-01",
+      "name": "[variables('sqlMiStorageName')]",
       "location": "[variables('location')]",
       "sku": {
         "name": "Standard_RAGRS"
@@ -316,37 +292,37 @@
     },
     {
       "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
-      "apiVersion": "2022-05-01",
-      "name": "[format('{0}/default/sql-backup', variables('sqlmiStorageName'))]",
+      "apiVersion": "2025-06-01",
+      "name": "[format('{0}/default/sql-backup', variables('sqlMiStorageName'))]",
       "properties": {
         "publicAccess": "None"
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts', variables('sqlmiStorageName'))]"
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('sqlMiStorageName'))]"
       ]
     },
     {
       "type": "Microsoft.Sql/managedInstances",
-      "apiVersion": "2021-05-01-preview",
-      "name": "[variables('sqlmiPrefix')]",
+      "apiVersion": "2024-11-01-preview",
+      "name": "[variables('sqlMiPrefix')]",
       "location": "[variables('location')]",
       "sku": {
-        "name": "[parameters('sqlmiSku')]",
+        "name": "[parameters('sqlMiSku')]",
         "tier": "GeneralPurpose"
       },
       "identity": {
         "type": "SystemAssigned"
       },
       "properties": {
-        "subnetId": "[format('{0}/subnets/AzureSQLMI', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix'))))]",
+        "subnetId": "[format('{0}/subnets/AzureSqlMI', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix'))))]",
         "storageSizeInGB": 64,
-        "vCores": "[parameters('sqlmiVCores')]",
+        "vCores": "[parameters('sqlMiVCores')]",
         "licenseType": "LicenseIncluded",
         "zoneRedundant": false,
         "minimalTlsVersion": "1.2",
         "requestedBackupStorageRedundancy": "Geo",
         "administratorLogin": "[variables('labUsername')]",
-        "administratorLoginPassword": "[variables('labSqlMIPassword')]",
+        "administratorLoginPassword": "[variables('labSqlMiPassword')]",
         "administrators": {
           "administratorType": "ActiveDirectory",
           "principalType": "User",
@@ -357,14 +333,13 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix')))]",
-        "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', variables('sqlmiPrefix')))]"
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix')))]"
       ]
     },
     {
       "type": "Microsoft.Network/routeTables",
-      "apiVersion": "2022-01-01",
-      "name": "[format('{0}-rt', variables('sqlmiPrefix'))]",
+      "apiVersion": "2025-01-01",
+      "name": "[format('{0}-rt', variables('sqlMiPrefix'))]",
       "location": "[variables('location')]",
       "properties": {
         "routes": [
@@ -576,8 +551,8 @@
     },
     {
       "type": "Microsoft.Network/networkSecurityGroups",
-      "apiVersion": "2022-01-01",
-      "name": "[format('{0}-nsg', variables('sqlmiPrefix'))]",
+      "apiVersion": "2025-01-01",
+      "name": "[format('{0}-nsg', variables('sqlMiPrefix'))]",
       "location": "[variables('location')]",
       "properties": {
         "securityRules": [
@@ -921,7 +896,7 @@
     },
     {
       "type": "Microsoft.Network/bastionHosts",
-      "apiVersion": "2023-09-01",
+      "apiVersion": "2025-01-01",
       "name": "[format('{0}-bastion', variables('hubNamePrefix'))]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
@@ -951,7 +926,7 @@
     },
     {
       "type": "Microsoft.Network/publicIPAddresses",
-      "apiVersion": "2020-11-01",
+      "apiVersion": "2025-01-01",
       "name": "[format('{0}-bastion-pip', variables('hubNamePrefix'))]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
@@ -965,65 +940,20 @@
       }
     },
     {
-      "type": "Microsoft.Network/networkInterfaces",
-      "apiVersion": "2021-03-01",
-      "name": "[format('{0}-nic', variables('onpremHyperVHostVMNamePrefix'))]",
-      "location": "[variables('location')]",
-      "tags": "[variables('tags')]",
-      "properties": {
-        "ipConfigurations": [
-          {
-            "name": "ipconfig1",
-            "properties": {
-              "subnet": {
-                "id": "[format('{0}/subnets/default', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onpremNamePrefix'))))]"
-              },
-              "privateIPAllocationMethod": "Dynamic"
-            }
-          }
-        ],
-        "networkSecurityGroup": {
-          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', variables('onpremHyperVHostVMNamePrefix')))]"
-        }
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', variables('onpremHyperVHostVMNamePrefix')))]",
-        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onpremNamePrefix')))]"
-      ]
-    },
-    {
-      "type": "Microsoft.Network/networkSecurityGroups",
-      "apiVersion": "2019-02-01",
-      "name": "[format('{0}-nsg', variables('onpremHyperVHostVMNamePrefix'))]",
-      "location": "[variables('location')]",
-      "tags": "[variables('tags')]",
-      "properties": {
-        "securityRules": [
-          {
-            "name": "RDP",
-            "properties": {
-              "protocol": "TCP",
-              "sourcePortRange": "*",
-              "destinationPortRange": "3389",
-              "sourceAddressPrefix": "*",
-              "destinationAddressPrefix": "*",
-              "access": "Allow",
-              "priority": 100,
-              "direction": "Inbound"
-            }
-          }
-        ]
-      }
-    },
-    {
       "type": "Microsoft.Compute/virtualMachines",
-      "apiVersion": "2021-07-01",
-      "name": "[format('{0}-vm', variables('onpremHyperVHostVMNamePrefix'))]",
+      "apiVersion": "2025-04-01",
+      "name": "[format('{0}-vm', variables('onPremWindowsVmPrefix'))]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
       "properties": {
         "hardwareProfile": {
           "vmSize": "[parameters('onpremVMSize')]"
+        },
+        "additionalCapabilities": {
+          "hibernationEnabled": false
         },
         "storageProfile": {
           "osDisk": {
@@ -1039,7 +969,7 @@
         "networkProfile": {
           "networkInterfaces": [
             {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', variables('onpremHyperVHostVMNamePrefix')))]"
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', variables('onPremWindowsVmPrefix')))]"
             }
           ]
         },
@@ -1050,35 +980,49 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', variables('onpremHyperVHostVMNamePrefix')))]"
+        "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', variables('onPremWindowsVmPrefix')))]"
       ]
     },
     {
-      "type": "Microsoft.Compute/virtualMachines/extensions",
-      "apiVersion": "2021-03-01",
-      "name": "[format('{0}/{1}', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'InstallHyperV')]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceGroup().name, format('{0}-vm', variables('onPremWindowsVmPrefix')), 'ArcOnboardingRole')]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b64e21ea-ac4e-4cdf-9dc9-5b892992bee7')]",
+        "principalId": "[reference(resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onPremWindowsVmPrefix'))), '2025-04-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onPremWindowsVmPrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2025-01-01",
+      "name": "[format('{0}-nic', variables('onPremWindowsVmPrefix'))]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
       "properties": {
-        "publisher": "Microsoft.Compute",
-        "type": "CustomScriptExtension",
-        "typeHandlerVersion": "1.10",
-        "autoUpgradeMinorVersion": true,
-        "settings": {
-          "fileUris": [
-            "[variables('installHyperVScriptUrl')]"
-          ],
-          "commandToExecute": "[format('powershell -ExecutionPolicy Unrestricted -File ./{0}', variables('installHyperVScriptName'))]"
-        }
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "subnet": {
+                "id": "[format('{0}/subnets/default', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix'))))]"
+              },
+              "privateIPAllocationMethod": "Dynamic"
+            }
+          }
+        ]
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')))]"
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]"
       ]
     },
     {
       "type": "Microsoft.Compute/virtualMachines/extensions",
-      "apiVersion": "2021-03-01",
-      "name": "[format('{0}/{1}', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'CreateGuestVMs')]",
+      "apiVersion": "2025-04-01",
+      "name": "[format('{0}/{1}', format('{0}-vm', variables('onPremWindowsVmPrefix')), 'WindowsVmConfig')]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
       "properties": {
@@ -1089,21 +1033,148 @@
         "settings": {
           "wmfVersion": "latest",
           "configuration": {
-            "url": "[variables('guestVmsArchiveUrl')]",
-            "script": "[variables('guestVmsScriptName')]",
-            "function": "Main"
-          },
-          "configurationArguments": {
-            "DbBackupFileUrl": "[variables('databaseBackupFileUrl')]",
-            "SqlConfigFileUrl": "[variables('sqlConfigScriptUrl')]",
-            "SqlVmImageUrl": "[variables('sqlVmImageUrl')]",
-            "WindowsVmImageUrl": "[variables('windowsVmImageUrl')]"
+            "url": "[variables('windowsVmScriptArchiveUrl')]",
+            "script": "[variables('windowsVmScriptName')]",
+            "function": "ArcConnect"
           }
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')))]",
-        "[resourceId('Microsoft.Compute/virtualMachines/extensions', format('{0}-vm', variables('onpremHyperVHostVMNamePrefix')), 'InstallHyperV')]"
+        "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onPremWindowsVmPrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2025-04-01",
+      "name": "[format('{0}-vm', variables('onPremSqlVmPrefix'))]",
+      "location": "[variables('location')]",
+      "tags": "[variables('tags')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('onpremVMSize')]"
+        },
+        "additionalCapabilities": {
+          "hibernationEnabled": false
+        },
+        "storageProfile": {
+          "osDisk": {
+            "createOption": "fromImage"
+          },
+          "imageReference": {
+            "publisher": "MicrosoftSQLServer",
+            "offer": "SQL2019-WS2022",
+            "sku": "Standard",
+            "version": "latest"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', variables('onPremSqlVmPrefix')))]"
+            }
+          ]
+        },
+        "osProfile": {
+          "computerName": "SqlServer",
+          "adminUsername": "[variables('labUsername')]",
+          "adminPassword": "[variables('labPassword')]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', variables('onPremSqlVmPrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2025-01-01",
+      "name": "[format('{0}-nsg', variables('onPremSqlVmPrefix'))]",
+      "location": "[variables('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "SQL-Inbound",
+            "properties": {
+              "protocol": "TCP",
+              "sourcePortRange": "*",
+              "destinationPortRange": "1433",
+              "sourceAddressPrefix": "10.2.1.0/24",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "SQL-Outbound",
+            "properties": {
+              "protocol": "TCP",
+              "sourcePortRange": "*",
+              "destinationPortRange": "1433",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "10.2.1.0/24",
+              "access": "Allow",
+              "priority": 110,
+              "direction": "Outbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2025-01-01",
+      "name": "[format('{0}-nic', variables('onPremSqlVmPrefix'))]",
+      "location": "[variables('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "subnet": {
+                "id": "[format('{0}/subnets/default', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix'))))]"
+              },
+              "privateIPAllocationMethod": "Dynamic"
+            }
+          }
+        ],
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', variables('onPremSqlVmPrefix')))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', variables('onPremSqlVmPrefix')))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "apiVersion": "2025-04-01",
+      "name": "[format('{0}/{1}', format('{0}-vm', variables('onPremSqlVmPrefix')), 'SqlVmConfig')]",
+      "location": "[variables('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "publisher": "Microsoft.Powershell",
+        "type": "DSC",
+        "typeHandlerVersion": "2.9",
+        "autoUpgradeMinorVersion": true,
+        "settings": {
+          "configuration": {
+            "url": "[variables('sqlVmScriptArchiveUrl')]",
+            "script": "[variables('sqlVmScriptName')]",
+            "function": "Main"
+          },
+          "configurationArguments": {
+            "DbBackupFileUrl": "[variables('databaseBackupFileUrl')]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onPremSqlVmPrefix')))]"
       ]
     }
   ]

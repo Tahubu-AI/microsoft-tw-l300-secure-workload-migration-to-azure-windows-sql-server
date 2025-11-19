@@ -23,14 +23,14 @@ param onpremVMSize string = 'Standard_D4s_v4'
     'GP_Gen4'
     'GP_Gen5'
 ])
-param sqlmiSku string = 'GP_Gen5'
+param sqlMiSku string = 'GP_Gen5'
 
 @description('The number of vCores for the SQL Managed Instance.')
 @allowed([
     4
     8
 ])
-param sqlmiVCores int = 4
+param sqlMiVCores int = 4
 
 @description('The branch of the GitHub repository to use for deployment scripts.')
 param repositoryBranch string = 'main'
@@ -45,13 +45,14 @@ param repositoryOwner string = 'Tahubu-AI'
 
 var location = resourceGroup().location
 
-var onpremNamePrefix = '${resourceNameBase}-onprem'
 var hubNamePrefix = '${resourceNameBase}-hub'
 var spokeNamePrefix = '${resourceNameBase}-spoke'
-var sqlmiPrefix = '${resourceNameBase}-sqlmi'
-var sqlmiStorageName = '${resourceNameBase}sqlmistor'
+var sqlMiPrefix = '${resourceNameBase}-sqlmi'
+var sqlMiStorageName = '${resourceNameBase}sqlmistor'
 
-var onpremHyperVHostVMNamePrefix = '${onpremNamePrefix}-hyperv'
+var onPremPrefix = '${resourceNameBase}-onprem'
+var onPremSqlVmPrefix = '${onPremPrefix}-sql'
+var onPremWindowsVmPrefix = '${onPremPrefix}-win'
 
 var gitHubRepo = '${repositoryOwner}/${repositoryName}'
 var gitHubRepoScriptPath = 'Hands-on%20lab/resources/deployment/onprem'
@@ -60,24 +61,17 @@ var gitHubRepoUrl = 'https://github.com/${gitHubRepo}/raw/refs/heads/${repositor
 var databaseBackupFile = 'database.bak'
 var databaseBackupFileUrl = '${gitHubRepoUrl}/${databaseBackupFile}'
 
-var guestVmsScriptName = 'create-guest-vms.ps1'
-var guestVmsScriptArchive = 'create-guest-vms.zip'
-var guestVmsArchiveUrl = '${gitHubRepoUrl}/${guestVmsScriptArchive}'
+var sqlVmScriptName = 'sql-vm-config.ps1'
+var sqlVmScriptArchive = 'sql-vm-config.zip'
+var sqlVmScriptArchiveUrl = '${gitHubRepoUrl}/${sqlVmScriptArchive}'
 
-var installHyperVScriptName = 'install-hyper-v.ps1'
-var installHyperVScriptUrl = '${gitHubRepoUrl}/${installHyperVScriptName}'
-
-var sqlConfigScriptName = 'sql-vm-config.ps1'
-var sqlConfigScriptUrl = '${gitHubRepoUrl}/${sqlConfigScriptName}'
-var sqlVmImageName = 'JSSQLStd19Base.vhdx'
-var sqlVmImageUrl = 'https://jumpstartprodsg.blob.core.windows.net/scenarios/prod/${sqlVmImageName}'
-
-var windowsVmImageName = 'OnPremWinServerVM.zip'
-var windowsVmImageUrl = '${gitHubRepoUrl}/${windowsVmImageName}'
+var windowsVmScriptName = 'windows-vm-config.ps1'
+var windowsVmScriptArchive = 'windows-vm-config.zip'
+var windowsVmScriptArchiveUrl = '${gitHubRepoUrl}/${windowsVmScriptArchive}'
 
 var labUsername = 'demouser'
 var labPassword = 'demo!pass123'
-var labSqlMIPassword = 'demo!pass1234567'
+var labSqlMiPassword = 'demo!pass1234567'
 
 var tags = {
     purpose: 'tech-workshop'
@@ -87,8 +81,8 @@ var tags = {
 /* ****************************
 Virtual Networks
 **************************** */
-resource onprem_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
-    name: '${onpremNamePrefix}-vnet'
+resource onprem_vnet 'Microsoft.Network/virtualNetworks@2025-01-01' = {
+    name: '${onPremPrefix}-vnet'
     location: location
     tags: tags
     properties: {
@@ -108,7 +102,7 @@ resource onprem_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
     }
 }
 
-resource hub_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
+resource hub_vnet 'Microsoft.Network/virtualNetworks@2025-01-01' = {
     name: '${hubNamePrefix}-vnet'
     location: location
     tags: tags
@@ -135,7 +129,7 @@ resource hub_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
     }
 }
 
-resource spoke_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
+resource spoke_vnet 'Microsoft.Network/virtualNetworks@2025-01-01' = {
     name: '${spokeNamePrefix}-vnet'
     location: location
     tags: tags
@@ -153,18 +147,18 @@ resource spoke_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
                 }
             }
             {
-                name: 'AzureSQLMI'
+                name: 'AzureSqlMI'
                 properties: {
                     addressPrefix: '10.2.1.0/24'
                     networkSecurityGroup: {
-                        id: sqlmi_subnet_nsg.id
+                        id: sqlMi_subnet_nsg.id
                     }
                     routeTable: {
-                        id: sqlmi_subnet_routetable.id
+                        id: sqlMi_subnet_routetable.id
                     }
                     delegations: [
                         {
-                            name: 'AzureSQLMI'
+                            name: 'AzureSqlMI'
                             properties: {
                                 serviceName: 'Microsoft.Sql/managedInstances'
                             }
@@ -180,7 +174,7 @@ resource spoke_vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
 /* ****************************
 Virtual Network Peerings
 **************************** */
-resource hub_onprem_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2020-11-01' = {
+resource hub_onprem_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
     parent: hub_vnet
     name: 'hub-onprem'
     properties: {
@@ -189,15 +183,10 @@ resource hub_onprem_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetwo
         }
         allowVirtualNetworkAccess: true
         allowForwardedTraffic: true
-        remoteAddressSpace: {
-            addressPrefixes: [
-                '10.0.0.0/16'
-            ]
-        }
     }
 }
 
-resource onprem_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2020-11-01' = {
+resource onprem_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
     parent: onprem_vnet
     name: 'onprem-hub'
     properties: {
@@ -206,15 +195,10 @@ resource onprem_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetwo
         }
         allowVirtualNetworkAccess: true
         allowForwardedTraffic: true
-        remoteAddressSpace: {
-            addressPrefixes: [
-                '10.1.0.0/16'
-            ]
-        }
     }
 }
 
-resource spoke_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2020-11-01' = {
+resource spoke_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
     parent: spoke_vnet
     name: 'spoke-hub'
     properties: {
@@ -223,15 +207,10 @@ resource spoke_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetwor
         }
         allowVirtualNetworkAccess: true
         allowForwardedTraffic: true
-        remoteAddressSpace: {
-            addressPrefixes: [
-                '10.1.0.0/16'
-            ]
-        }
     }
 }
 
-resource hub_spoke_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2020-11-01' = {
+resource hub_spoke_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
     parent: hub_vnet
     name: 'hub-spoke'
     properties: {
@@ -240,19 +219,14 @@ resource hub_spoke_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetwor
         }
         allowVirtualNetworkAccess: true
         allowForwardedTraffic: true
-        remoteAddressSpace: {
-            addressPrefixes: [
-                '10.2.0.0/16'
-            ]
-        }
     }
 }
 
 /* ****************************
 Azure SQL Managed Instance
 **************************** */
-resource sqlmi_storage 'Microsoft.Storage/storageAccounts@2022-05-01' = {
-    name: sqlmiStorageName
+resource sqlMi_storage 'Microsoft.Storage/storageAccounts@2025-06-01' = {
+    name: sqlMiStorageName
     location: location
     sku: {
         name: 'Standard_RAGRS'
@@ -263,36 +237,33 @@ resource sqlmi_storage 'Microsoft.Storage/storageAccounts@2022-05-01' = {
     }
 }
 
-resource sqlmi_storage_container 'Microsoft.Storage/storageAccounts/blobServices/containers@2022-05-01' = {
-    name: '${sqlmi_storage.name}/default/sql-backup'
+resource sqlMi_storage_container 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-06-01' = {
+    name: '${sqlMi_storage.name}/default/sql-backup'
     properties: {
         publicAccess: 'None'
     }
 }
 
-resource sqlmi 'Microsoft.Sql/managedInstances@2021-05-01-preview' = {
-    name: sqlmiPrefix
+resource sqlMi 'Microsoft.Sql/managedInstances@2024-11-01-preview' = {
+    name: sqlMiPrefix
     location: location
-    dependsOn: [
-        sqlmi_subnet_nsg
-    ]
     sku: {
-        name: sqlmiSku
+        name: sqlMiSku
         tier: 'GeneralPurpose'
     }
     identity: {
         type: 'SystemAssigned'
     }
     properties: {
-        subnetId: '${spoke_vnet.id}/subnets/AzureSQLMI'
+        subnetId: '${spoke_vnet.id}/subnets/AzureSqlMI'
         storageSizeInGB: 64
-        vCores: sqlmiVCores
+        vCores: sqlMiVCores
         licenseType: 'LicenseIncluded'
         zoneRedundant: false
         minimalTlsVersion: '1.2'
         requestedBackupStorageRedundancy: 'Geo'
         administratorLogin: labUsername
-        administratorLoginPassword: labSqlMIPassword
+        administratorLoginPassword: labSqlMiPassword
         administrators: {
             administratorType: 'ActiveDirectory'
             principalType: 'User'
@@ -304,8 +275,8 @@ resource sqlmi 'Microsoft.Sql/managedInstances@2021-05-01-preview' = {
     }
 }
 
-resource sqlmi_subnet_routetable 'Microsoft.Network/routeTables@2022-01-01'= {
-    name: '${sqlmiPrefix}-rt'
+resource sqlMi_subnet_routetable 'Microsoft.Network/routeTables@2025-01-01'= {
+    name: '${sqlMiPrefix}-rt'
     location: location
     properties: {
         routes: [
@@ -516,8 +487,8 @@ resource sqlmi_subnet_routetable 'Microsoft.Network/routeTables@2022-01-01'= {
     }
 }
 
-resource sqlmi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2022-01-01' = {
-    name: '${sqlmiPrefix}-nsg'
+resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' = {
+    name: '${sqlMiPrefix}-nsg'
     location: location
     properties: {
         securityRules: [
@@ -863,7 +834,7 @@ resource sqlmi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2022-01-01' =
 /* ****************************
 Azure Bastion
 **************************** */
-resource hub_bastion 'Microsoft.Network/bastionHosts@2023-09-01' = {
+resource bastion 'Microsoft.Network/bastionHosts@2025-01-01' = {
     name: '${hubNamePrefix}-bastion'
     location: location
     tags: tags
@@ -877,7 +848,7 @@ resource hub_bastion 'Microsoft.Network/bastionHosts@2023-09-01' = {
                 properties: {
                     privateIPAllocationMethod: 'Dynamic'
                     publicIPAddress: {
-                        id: hub_bastion_public_ip.id
+                        id: bastion_public_ip.id
                     }
                     subnet: {
                         id: '${hub_vnet.id}/subnets/AzureBastionSubnet'
@@ -888,7 +859,7 @@ resource hub_bastion 'Microsoft.Network/bastionHosts@2023-09-01' = {
     }
 }
 
-resource hub_bastion_public_ip 'Microsoft.Network/publicIPAddresses@2020-11-01' = {
+resource bastion_public_ip 'Microsoft.Network/publicIPAddresses@2025-01-01' = {
     name: '${hubNamePrefix}-bastion-pip'
     location: location
     tags: tags
@@ -903,60 +874,21 @@ resource hub_bastion_public_ip 'Microsoft.Network/publicIPAddresses@2020-11-01' 
 }
 
 /* ****************************
-On-premises Hyper-V Host VM
+On-premises Windows VM
 **************************** */
-resource onprem_hyperv_nic 'Microsoft.Network/networkInterfaces@2021-03-01' = {
-    name: '${onpremHyperVHostVMNamePrefix}-nic'
+resource onprem_windows_vm 'Microsoft.Compute/virtualMachines@2025-04-01' = {
+    name: '${onPremWindowsVmPrefix}-vm'
     location: location
     tags: tags
-    properties: {
-        ipConfigurations: [
-            {
-                name: 'ipconfig1'
-                properties: {
-                    subnet: {
-                        id: '${onprem_vnet.id}/subnets/default'
-                    }
-                    privateIPAllocationMethod: 'Dynamic'
-                }
-            }
-        ]
-        networkSecurityGroup: {
-            id: onprem_hyperv_nsg.id
-        }
+    identity: {
+        type: 'SystemAssigned'
     }
-}
-
-resource onprem_hyperv_nsg 'Microsoft.Network/networkSecurityGroups@2019-02-01' = {
-    name: '${onpremHyperVHostVMNamePrefix}-nsg'
-    location: location
-    tags: tags
-    properties: {
-        securityRules: [
-            {
-                name: 'RDP'
-                properties: {
-                    protocol: 'TCP'
-                    sourcePortRange: '*'
-                    destinationPortRange: '3389'
-                    sourceAddressPrefix: '*'
-                    destinationAddressPrefix: '*'
-                    access: 'Allow'
-                    priority: 100
-                    direction: 'Inbound'
-                }
-            }
-        ]
-    }
-}
-
-resource onprem_hyperv_vm 'Microsoft.Compute/virtualMachines@2021-07-01' = {
-    name: '${onpremHyperVHostVMNamePrefix}-vm'
-    location: location
-    tags: tags
     properties: {
         hardwareProfile: {
             vmSize: onpremVMSize
+        }
+        additionalCapabilities: {
+            hibernationEnabled: false
         }
         storageProfile: {
             osDisk: {
@@ -972,47 +904,57 @@ resource onprem_hyperv_vm 'Microsoft.Compute/virtualMachines@2021-07-01' = {
         networkProfile: {
             networkInterfaces: [
                 {
-                    id: onprem_hyperv_nic.id
+                    id: onprem_windows_nic.id
                 }
             ]
         }
         osProfile: {
             computerName: 'WinServer'
-#disable-next-line adminusername-should-not-be-literal
+            #disable-next-line adminusername-should-not-be-literal
             adminUsername: labUsername
-#disable-next-line use-secure-value-for-secure-inputs
+            #disable-next-line use-secure-value-for-secure-inputs
             adminPassword: labPassword
         }
     }
 }
 
-resource onprem_hyperv_vm_ext_installhyperv 'Microsoft.Compute/virtualMachines/extensions@2021-03-01' = {
-    parent: onprem_hyperv_vm
-    name: 'InstallHyperV'
+// Assign the "Azure Connected Machine Onboarding" role to the VM's identity
+resource arcRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().name, onprem_windows_vm.name, 'ArcOnboardingRole')
+  properties: {
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      'b64e21ea-ac4e-4cdf-9dc9-5b892992bee7' // Azure Connected Machine Onboarding role
+    )
+    principalId: onprem_windows_vm.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource onprem_windows_nic 'Microsoft.Network/networkInterfaces@2025-01-01' = {
+    name: '${onPremWindowsVmPrefix}-nic'
     location: location
     tags: tags
     properties: {
-        publisher: 'Microsoft.Compute'
-        type: 'CustomScriptExtension'
-        typeHandlerVersion: '1.10'
-        autoUpgradeMinorVersion: true
-        settings: {
-            fileUris: [
-                installHyperVScriptUrl
-            ]
-            commandToExecute: 'powershell -ExecutionPolicy Unrestricted -File ./${installHyperVScriptName}'
-        }
+        ipConfigurations: [
+            {
+                name: 'ipconfig1'
+                properties: {
+                    subnet: {
+                        id: '${onprem_vnet.id}/subnets/default'
+                    }
+                    privateIPAllocationMethod: 'Dynamic'
+                }
+            }
+        ]
     }
 }
 
-resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2021-03-01' = {
-    parent: onprem_hyperv_vm
-    name: 'CreateGuestVMs'
+resource onprem_windows_vm_ext 'Microsoft.Compute/virtualMachines/extensions@2025-04-01' = {
+    parent: onprem_windows_vm
+    name: 'WindowsVmConfig'
     location: location
     tags: tags
-    dependsOn: [
-        onprem_hyperv_vm_ext_installhyperv
-    ]
     properties: {
         publisher: 'Microsoft.Powershell'
         type: 'DSC'
@@ -1021,15 +963,135 @@ resource onprem_hyperv_guest_vms 'Microsoft.Compute/virtualMachines/extensions@2
         settings: {
             wmfVersion: 'latest'
             configuration: {
-                url: guestVmsArchiveUrl
-                script: guestVmsScriptName
+                url: windowsVmScriptArchiveUrl
+                script: windowsVmScriptName
+                function: 'ArcConnect'
+            }
+        }
+    }
+}
+
+/* ****************************
+On-premises SQL VM
+**************************** */
+resource onprem_sql_vm 'Microsoft.Compute/virtualMachines@2025-04-01' = {
+    name: '${onPremSqlVmPrefix}-vm'
+    location: location
+    tags: tags
+    identity: {
+        type: 'SystemAssigned'
+    }
+    properties: {
+        hardwareProfile: {
+            vmSize: onpremVMSize
+        }
+        additionalCapabilities: {
+            hibernationEnabled: false
+        }
+        storageProfile: {
+            osDisk: {
+                createOption: 'fromImage'
+            }
+            imageReference: {
+                publisher: 'MicrosoftSQLServer'
+                offer: 'SQL2019-WS2022'
+                sku: 'Standard'
+                version: 'latest'
+            }
+        }
+        networkProfile: {
+            networkInterfaces: [
+                {
+                    id: onprem_sql_nic.id
+                }
+            ]
+        }
+        osProfile: {
+            computerName: 'SqlServer'
+            #disable-next-line adminusername-should-not-be-literal
+            adminUsername: labUsername
+            #disable-next-line use-secure-value-for-secure-inputs
+            adminPassword: labPassword
+        }
+    }
+}
+
+resource onprem_sql_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' = {
+  name: '${onPremSqlVmPrefix}-nsg'
+  location: location
+  tags: tags
+  properties: {
+    securityRules: [
+      {
+        name: 'SQL-Inbound'
+        properties: {
+          protocol: 'TCP'
+          sourcePortRange: '*'
+          destinationPortRange: '1433'
+          sourceAddressPrefix: '10.2.1.0/24'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 100
+          direction: 'Inbound'
+        }
+      }
+      {
+        name: 'SQL-Outbound'
+        properties: {
+          protocol: 'TCP'
+          sourcePortRange: '*'
+          destinationPortRange: '1433'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: '10.2.1.0/24'
+          access: 'Allow'
+          priority: 110
+          direction: 'Outbound'
+        }
+      }
+    ]
+  }
+}
+
+resource onprem_sql_nic 'Microsoft.Network/networkInterfaces@2025-01-01' = {
+    name: '${onPremSqlVmPrefix}-nic'
+    location: location
+    tags: tags
+    properties: {
+        ipConfigurations: [
+            {
+                name: 'ipconfig1'
+                properties: {
+                    subnet: {
+                        id: '${onprem_vnet.id}/subnets/default'
+                    }
+                    privateIPAllocationMethod: 'Dynamic'
+                }
+            }
+        ]
+        networkSecurityGroup: {
+            id: onprem_sql_nsg.id
+        }
+    }
+}
+
+resource onprem_sql_vm_ext 'Microsoft.Compute/virtualMachines/extensions@2025-04-01' = {
+    parent: onprem_sql_vm
+    name: 'SqlVmConfig'
+    location: location
+    tags: tags
+    properties: {
+        publisher: 'Microsoft.Powershell'
+        type: 'DSC'
+        typeHandlerVersion: '2.9'
+        autoUpgradeMinorVersion: true
+        settings: {
+            configuration: {
+                url: sqlVmScriptArchiveUrl
+                script: sqlVmScriptName
                 function: 'Main'
             }
             configurationArguments: {
                 DbBackupFileUrl: databaseBackupFileUrl
-                SqlConfigFileUrl: sqlConfigScriptUrl
-                SqlVmImageUrl: sqlVmImageUrl
-                WindowsVmImageUrl: windowsVmImageUrl
             }
         }
     }
