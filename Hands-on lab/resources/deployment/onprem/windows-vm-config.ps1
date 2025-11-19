@@ -82,8 +82,8 @@ Configuration ArcConnect {
                 # Firewall rules
                 Write-Host "Configuring firewall rules Arc..."
                 $fwRules = Get-NetFirewallRule | Select-Object -ExpandProperty DisplayName
-                if (-not ($fwRules -contains "Block Azure IMDS")) {
-                    New-NetFirewallRule -Name BlockAzureIMDS -DisplayName "Block Azure IMDS" -Enabled True -Profile Any -Direction Outbound -Action Block -RemoteAddress 169.254.169.254
+                if (-not ($fwRules -contains "block_azure_imds")) {
+                    New-NetFirewallRule -Name block_azure_imds -DisplayName "Block Azure IMDS" -Enabled True -Profile Any -Direction Outbound -Action Block -RemoteAddress 169.254.169.254
                     Write-Verbose "Firewall rule added: Block Azure IMDS"
                 }
             }
