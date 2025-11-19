@@ -18,29 +18,6 @@ Configuration ArcConnect {
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
     Node "localhost" {
-        # Set environment variable to override the ARC on an Azure VM installation
-        Script SetArcTestEnvVar {
-            GetScript = {
-                $val = [System.Environment]::GetEnvironmentVariable("MSFT_ARC_TEST",'Machine')
-                @{ Result = $val }
-            }
-            TestScript = {
-                [System.Environment]::GetEnvironmentVariable("MSFT_ARC_TEST",'Machine') -eq 'true'
-            }
-            SetScript = {
-                Write-Verbose "Setting MSFT_ARC_TEST environment variable..."
-                [System.Environment]::SetEnvironmentVariable("MSFT_ARC_TEST",'true',[System.EnvironmentVariableTarget]::Machine)
-            }
-        }
-
-        # Disable Windows Azure guest agent to allow Azure Arc Service connection installation
-        Service DisableGuestAgent {
-            DependsOn  = '[Script]SetArcTestEnvVar'
-            Name = 'WindowsAzureGuestAgent'
-            StartupType = 'Disabled'
-            State = 'Stopped'
-        }
-
         # Disable the Server Manager from starting on login
         Script DisableServerManager {
             GetScript = {
@@ -110,51 +87,107 @@ Configuration ArcConnect {
             }
         }
 
-        # Install Arc Connected Machine Module
-        Script InstallConnectedMachineModule {
-            DependsOn = '[Service]DisableGuestAgent'
+        # Set environment variable to override the ARC on an Azure VM installation
+        Script SetArcTestEnvVar {
             GetScript = {
-                $module = Get-InstalledModule -Name Az.ConnectedMachine -ErrorAction SilentlyContinue
-                if ($null -ne $module) {
-                    @{ Result = "Installed version $($module.Version)" }
-                } else {
-                    @{ Result = "Not installed" }
-                }
+                $val = [System.Environment]::GetEnvironmentVariable("MSFT_ARC_TEST",'Machine')
+                @{ Result = $val }
             }
             TestScript = {
-                $module = Get-InstalledModule -Name Az.ConnectedMachine -ErrorAction SilentlyContinue
-                $null -ne $module
+                [System.Environment]::GetEnvironmentVariable("MSFT_ARC_TEST",'Machine') -eq 'true'
             }
             SetScript = {
-                Write-Verbose "Installing Az.ConnectedMachine module..."
-                Install-Module -Name Az.ConnectedMachine -Force -AllowClobber -ErrorAction Stop
+                Write-Verbose "Setting MSFT_ARC_TEST environment variable..."
+                [System.Environment]::SetEnvironmentVariable("MSFT_ARC_TEST",'true',[System.EnvironmentVariableTarget]::Machine)
             }
         }
 
-        # Connect the machine to Azure Arc
-        Script ConnectArcMachine {
-            DependsOn = '[Script]InstallConnectedMachineModule'
+        Script ScheduleArcOnboarding {
+            DependsOn = '[Script]SetArcTestEnvVar'
             GetScript = {
-                # Check if the machine is already connected
-                try {
-                    $connected = Get-AzConnectedMachine -ResourceGroupName $using:ResourceGroupName -Name $using:MachineName -ErrorAction SilentlyContinue
-                    if ($null -ne $connected) {
-                        @{ Result = "Connected to Arc: $($connected.Name)" }
-                    } else {
-                        @{ Result = "Not connected" }
-                    }
-                } catch {
-                    @{ Result = "Not connected" }
-                }
+                $task = Get-ScheduledTask -TaskName 'ArcOnboardAfterDSC' -ErrorAction SilentlyContinue
+                if ($null -ne $task) { @{ Result = "Scheduled" } } else { @{ Result = "NotScheduled" } }
             }
             TestScript = {
-                # Return $true if the machine is already connected
-                $connected = Get-AzConnectedMachine -ResourceGroupName $using:ResourceGroupName -Name $using:MachineName -ErrorAction SilentlyContinue
-                $null -ne $connected
+                $task = Get-ScheduledTask -TaskName 'ArcOnboardAfterDSC' -ErrorAction SilentlyContinue
+                return ($null -ne $task)
             }
             SetScript = {
-                Write-Verbose "Connecting machine to Azure Arc..."
-                Connect-AzConnectedMachine -SubscriptionId $using:SubscriptionId -ResourceGroupName $using:ResourceGroupName -Name $using:MachineName -Location $using:Location -ErrorAction Stop
+                try {
+                    Write-Verbose "Preparing path for Arc onboarding payload..."
+                    $prepDir    = 'C:\ArcPrep'
+                    $scriptPath = Join-Path $prepDir 'ArcOnboard.ps1'
+
+                    if (-not (Test-Path -LiteralPath $prepDir)) {
+                        New-Item -Path $prepDir -ItemType Directory -Force | Out-Null
+                    }
+
+                    # Write payload script with Guest Agent disable + module install + Arc connect
+                    @"
+Start-Transcript -Path 'C:\ArcPrep\ArcOnboard.log' -Append
+
+try {
+    Write-Output 'Disabling WindowsAzureGuestAgent...'
+    Stop-Service WindowsAzureGuestAgent -Force -ErrorAction SilentlyContinue
+    Set-Service WindowsAzureGuestAgent -StartupType Disabled
+} catch {
+    Write-Warning "Failed to disable Guest Agent: `$($_.Exception.Message)"
+}
+
+try {
+    Write-Output 'Installing Az.ConnectedMachine module...'
+    Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted -ErrorAction SilentlyContinue
+    Install-Module -Name Az.ConnectedMachine -Force -AllowClobber -ErrorAction Stop
+} catch {
+    Write-Error "Failed to install Az.ConnectedMachine: `$($_.Exception.Message)"
+    Stop-Transcript
+    exit 1
+}
+
+try {
+    Write-Output 'Connecting machine to Azure Arc...'
+    `$result = Connect-AzConnectedMachine `
+        -SubscriptionId '$using:SubscriptionId' `
+        -ResourceGroupName '$using:ResourceGroupName' `
+        -Name '$using:MachineName' `
+        -Location '$using:Location' `
+        -ErrorAction Stop
+
+    if (`$null -eq `$result) { throw 'Connect-AzConnectedMachine returned null.' }
+    Write-Output 'Arc connect succeeded.'
+} catch {
+    Write-Error "Arc connect failed: `$($_.Exception.Message)"
+    Stop-Transcript
+    exit 1
+}
+
+try {
+    Write-Output 'Self-deleting scheduled task...'
+    schtasks /Delete /TN 'ArcOnboardAfterDSC' /F | Out-Null
+} catch {
+    Write-Warning "Task self-delete failed: `$($_.Exception.Message)"
+}
+
+Stop-Transcript
+"@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
+
+                    Write-Verbose "Creating scheduled task to run Arc onboarding payload..."
+                    $taskAction    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+                    $taskTrigger   = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
+                    $taskPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
+                    $taskSettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+
+                    Register-ScheduledTask -TaskName 'ArcOnboardAfterDSC' `
+                        -Action $taskAction `
+                        -Trigger $taskTrigger `
+                        -Principal $taskPrincipal `
+                        -Settings $taskSettings -Force | Out-Null
+
+                    Write-Verbose "Scheduled task created. It will disable Guest Agent, install module, connect to Arc, and then delete itself."
+                } catch {
+                    Write-Error "Failed to schedule Arc onboarding task: $($_.Exception.Message)"
+                    throw
+                }
             }
         }
     }
