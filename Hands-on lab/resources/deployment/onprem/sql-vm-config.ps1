@@ -393,29 +393,54 @@ Configuration Main {
                 return ($null -ne $task)
             }
             SetScript = {
-                Write-Verbose "Creating scheduled task to disable WindowsAzureGuestAgent after DSC completes..."
+                try {
+                    Write-Verbose "Preparing path for scheduled task payload..."
+                    $prepDir    = 'C:\ArcPrep'
+                    $scriptPath = Join-Path $prepDir 'DisableGuestAgent.ps1'
 
-                $scriptPath = "C:\ArcPrep\DisableGuestAgent.ps1"
-                @"
-Stop-Service WindowsAzureGuestAgent -Force -ErrorAction SilentlyContinue
-Set-Service WindowsAzureGuestAgent -StartupType Disabled
-schtasks /Delete /TN 'DisableGuestAgentAfterDSC' /F | Out-Null
-"@ | Set-Content -Path $scriptPath -Encoding UTF8
+                    # Ensure directory exists
+                    if (-not (Test-Path -LiteralPath $prepDir)) {
+                        New-Item -Path $prepDir -ItemType Directory -Force | Out-Null
+                    }
 
-                $taskAction    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
-                $taskTrigger   = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2)
-                $taskPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
-                $taskSettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+                    # Write payload script
+                    @"
+Start-Transcript -Path 'C:\ArcPrep\DisableGuestAgent.log' -Append
+try {
+    Write-Output 'Disabling WindowsAzureGuestAgent...'
+    Stop-Service WindowsAzureGuestAgent -Force -ErrorAction SilentlyContinue
+    Set-Service WindowsAzureGuestAgent -StartupType Disabled
+    Write-Output 'Guest Agent disabled.'
+} catch {
+    Write-Error "Failed to disable Guest Agent: `$($_.Exception.Message)"
+}
+try {
+    Write-Output 'Self-deleting scheduled task...'
+    schtasks /Delete /TN 'DisableGuestAgentAfterDSC' /F | Out-Null
+} catch {
+    Write-Warning "Task self-delete failed: `$($_.Exception.Message)"
+}
+Stop-Transcript
+"@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
 
-                Register-ScheduledTask -TaskName 'DisableGuestAgentAfterDSC' `
-                    -Action $taskAction `
-                    -Trigger $taskTrigger `
-                    -Principal $taskPrincipal `
-                    -Settings $taskSettings -Force | Out-Null
+                    Write-Verbose "Creating scheduled task to run payload..."
+                    $taskAction    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+                    $taskTrigger   = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
+                    $taskPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
+                    $taskSettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
-                Write-Verbose "Scheduled task created. Guest Agent will be disabled and task will self-delete."
+                    Register-ScheduledTask -TaskName 'DisableGuestAgentAfterDSC' `
+                        -Action $taskAction `
+                        -Trigger $taskTrigger `
+                        -Principal $taskPrincipal `
+                        -Settings $taskSettings -Force | Out-Null
+
+                    Write-Verbose "Scheduled task created. It will disable Guest Agent and then delete itself."
+                } catch {
+                    Write-Error "Failed to schedule Guest Agent disable task: $($_.Exception.Message)"
+                    throw
+                }
             }
         }
-
     }
 }
