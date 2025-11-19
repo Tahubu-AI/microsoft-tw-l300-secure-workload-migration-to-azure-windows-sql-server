@@ -315,7 +315,7 @@ Configuration Main {
         }
 
         # Set FULL recovery mode on ToyStore database
-        Script ConfigureRecoveryModel {
+        Script SetToyStoreRecoveryMode {
             DependsOn = '[Script]RestoreToyStore'
             GetScript = {
                 $model = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
@@ -332,6 +332,57 @@ Configuration Main {
                 Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "
                     ALTER DATABASE ToyStore SET RECOVERY FULL"
                 Backup-SqlDatabase -ServerInstance Localhost -Database ToyStore
+            }
+        }
+
+        # Set SIMPLE recovery mode on ToyStore database
+        Script SetCustomer360RecoveryMode {
+            DependsOn = '[Script]RestoreCustomer360Database'  # adjust to whatever restores/creates the DB
+            GetScript = {
+                # Check current recovery model
+                $query = "SELECT recovery_model_desc FROM sys.databases WHERE name = 'Customer360';"
+                $result = Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query $query -ErrorAction SilentlyContinue
+                @{ Result = $result.recovery_model_desc }
+            }
+            TestScript = {
+                $query = "SELECT recovery_model_desc FROM sys.databases WHERE name = 'Customer360';"
+                $result = Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query $query -ErrorAction SilentlyContinue
+                return ($result.recovery_model_desc -eq 'SIMPLE')
+            }
+            SetScript = {
+                Write-Verbose "Setting Customer360 recovery model to SIMPLE..."
+                $query = "ALTER DATABASE [Customer360] SET RECOVERY SIMPLE;"
+                Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query $query -ErrorAction Stop
+            }
+        }
+
+        # Create full backup of ToyStore database
+        Script BackupToyStoreDatabase {
+            DependsOn = '[Script]RestoreToyStoreDatabase'
+            GetScript = {
+                $backupPath = "C:\Database\Backup\ToyStore_full.bak"
+                if (Test-Path $backupPath) {
+                    @{ Result = "Backup exists at $backupPath" }
+                } else {
+                    @{ Result = "No backup found" }
+                }
+            }
+            TestScript = {
+                $backupPath = "C:\Database\Backup\ToyStore_full.bak"
+                return (Test-Path $backupPath)
+            }
+            SetScript = {
+                Write-Verbose "Performing full backup of ToyStore database..."
+                $backupDir = "C:\Database\Backup"
+                $backupPath = "$backupDir\ToyStore_full.bak"
+
+                # Ensure the backup directory exists
+                if (-not (Test-Path $backupDir)) {
+                    New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+                }
+
+                $query = "BACKUP DATABASE [ToyStore] TO DISK = N'$backupPath' WITH INIT, FORMAT, NAME = 'ToyStore-FullBackup';"
+                Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query $query -ErrorAction Stop
             }
         }
 
