@@ -10,7 +10,10 @@ Configuration ArcConnect {
         [String]$MachineName,
 
         [Parameter(Mandatory)]
-        [String]$Location
+        [String]$Location,
+
+        [Parameter(Mandatory)]
+        [String]$SubscriptionId
     )
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
@@ -40,19 +43,19 @@ Configuration ArcConnect {
 
         # Disable the Server Manager from starting on login
         Script DisableServerManager {
-            SetScript = {
-                # Disable the Server Manager scheduled task
-                Get-ScheduledTask -TaskName 'ServerManager' | Disable-ScheduledTask
+            GetScript = {
+                # Return current state for reporting
+                $task = Get-ScheduledTask -TaskName 'ServerManager'
+                @{ Result = $task.State }
             }
             TestScript = {
                 # Check if the task is already disabled
                 $task = Get-ScheduledTask -TaskName 'ServerManager'
                 return ($task.State -eq 'Disabled')
             }
-            GetScript = {
-                # Return current state for reporting
-                $task = Get-ScheduledTask -TaskName 'ServerManager'
-                @{ Result = $task.State }
+            SetScript = {
+                # Disable the Server Manager scheduled task
+                Get-ScheduledTask -TaskName 'ServerManager' | Disable-ScheduledTask -ErrorAction SilentlyContinue
             }
         }
 
@@ -99,9 +102,9 @@ Configuration ArcConnect {
                     New-Item -Path $EdgePolicyPath -Force | Out-Null
                 }
 
-                Set-ItemProperty -Path $EdgePolicyPath -Name "HideFirstRunExperience" -Type DWord -Value 1
-                Set-ItemProperty -Path $EdgePolicyPath -Name "DefaultBrowserSettingEnabled" -Type DWord -Value 0
-                Set-ItemProperty -Path $EdgePolicyPath -Name "HubsSidebarEnabled" -Type DWord -Value 0
+                Set-ItemProperty -Path $EdgePolicyPath -Name "HideFirstRunExperience" -Type DWord -Value 1 -ErrorAction SilentlyContinue
+                Set-ItemProperty -Path $EdgePolicyPath -Name "DefaultBrowserSettingEnabled" -Type DWord -Value 0 -ErrorAction SilentlyContinue
+                Set-ItemProperty -Path $EdgePolicyPath -Name "HubsSidebarEnabled" -Type DWord -Value 0 -ErrorAction SilentlyContinue
 
                 Write-Verbose "Microsoft Edge First Run Experience disabled successfully."
             }
@@ -124,7 +127,7 @@ Configuration ArcConnect {
             }
             SetScript = {
                 Write-Verbose "Installing Az.ConnectedMachine module..."
-                Install-Module -Name Az.ConnectedMachine -Force -AllowClobber
+                Install-Module -Name Az.ConnectedMachine -Force -AllowClobber -ErrorAction Stop
             }
         }
 
@@ -151,7 +154,7 @@ Configuration ArcConnect {
             }
             SetScript = {
                 Write-Verbose "Connecting machine to Azure Arc..."
-                Connect-AzConnectedMachine -ResourceGroupName $using:ResourceGroupName -Name $using:MachineName -Location $using:Location
+                Connect-AzConnectedMachine -SubscriptionId $using:SubscriptionId -ResourceGroupName $using:ResourceGroupName -Name $using:MachineName -Location $using:Location -ErrorAction Stop
             }
         }
     }

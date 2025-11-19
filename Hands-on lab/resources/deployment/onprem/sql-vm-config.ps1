@@ -53,7 +53,7 @@ Configuration Main {
             }
             SetScript = {
                 # Disable the Server Manager scheduled task
-                Get-ScheduledTask -TaskName 'ServerManager' | Disable-ScheduledTask
+                Get-ScheduledTask -TaskName 'ServerManager' | Disable-ScheduledTask -ErrorAction SilentlyContinue
             }
         }
 
@@ -100,9 +100,9 @@ Configuration Main {
                     New-Item -Path $EdgePolicyPath -Force | Out-Null
                 }
 
-                Set-ItemProperty -Path $EdgePolicyPath -Name "HideFirstRunExperience" -Type DWord -Value 1
-                Set-ItemProperty -Path $EdgePolicyPath -Name "DefaultBrowserSettingEnabled" -Type DWord -Value 0
-                Set-ItemProperty -Path $EdgePolicyPath -Name "HubsSidebarEnabled" -Type DWord -Value 0
+                Set-ItemProperty -Path $EdgePolicyPath -Name "HideFirstRunExperience" -Type DWord -Value 1 -ErrorAction SilentlyContinue
+                Set-ItemProperty -Path $EdgePolicyPath -Name "DefaultBrowserSettingEnabled" -Type DWord -Value 0 -ErrorAction SilentlyContinue
+                Set-ItemProperty -Path $EdgePolicyPath -Name "HubsSidebarEnabled" -Type DWord -Value 0 -ErrorAction SilentlyContinue
 
                 Write-Verbose "Microsoft Edge First Run Experience disabled successfully."
             }
