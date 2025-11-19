@@ -337,7 +337,7 @@ Configuration Main {
 
         # Set SIMPLE recovery mode on ToyStore database
         Script SetCustomer360RecoveryMode {
-            DependsOn = '[Script]RestoreCustomer360Database'  # adjust to whatever restores/creates the DB
+            DependsOn = '[Script]RestoreCustomer360'
             GetScript = {
                 # Check current recovery model
                 $query = "SELECT recovery_model_desc FROM sys.databases WHERE name = 'Customer360';"
@@ -358,7 +358,7 @@ Configuration Main {
 
         # Create full backup of ToyStore database
         Script BackupToyStoreDatabase {
-            DependsOn = '[Script]RestoreToyStoreDatabase'
+            DependsOn = '[Script]RestoreToyStore'
             GetScript = {
                 $backupPath = "C:\Database\Backup\ToyStore_full.bak"
                 if (Test-Path $backupPath) {

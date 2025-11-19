@@ -1,9 +1,9 @@
 var resourceNameBase = 'tailspin${take(uniqueString(resourceGroup().id), 7)}'
 
 @description('The Id of the Azure AD User.')
-param azureAdUserId string
+param azureAdUserId string = 'bfec0b43-31c7-48b2-a22a-c402ca6df7d6'
 @description('The Login of the Azure AD User (ex: username@domain.onmicrosoft.com).')
-param azureAdUserLogin string
+param azureAdUserLogin string = 'kyle@tahubu.com'
 
 @description('The VM size for the virtual machines. Allows Intel and AMD 4-core options with premium and non-premium storage.')
 @allowed([
@@ -33,7 +33,7 @@ param sqlMiSku string = 'GP_Gen5'
 param sqlMiVCores int = 4
 
 @description('The branch of the GitHub repository to use for deployment scripts.')
-param repositoryBranch string = 'main'
+param repositoryBranch string = 'kb-lab-01'
 @description('The name of the GitHub repository containing deployment scripts.')
 param repositoryName string = 'microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server'
 @description('The owner of the GitHub repository containing deployment scripts.')
@@ -91,15 +91,15 @@ resource onprem_vnet 'Microsoft.Network/virtualNetworks@2025-01-01' = {
                 '10.0.0.0/16'
             ]
         }
-        subnets: [
-            {
-                name: 'default'
-                properties: {
-                    addressPrefix: '10.0.0.0/24'
-                }
-            }
-        ]
     }
+}
+
+resource onprem_subnet 'Microsoft.Network/virtualNetworks/subnets@2025-01-01' = {
+  parent: onprem_vnet
+  name: 'default'
+  properties: {
+    addressPrefix: '10.0.0.0/24'
+  }
 }
 
 resource hub_vnet 'Microsoft.Network/virtualNetworks@2025-01-01' = {
@@ -198,24 +198,24 @@ resource onprem_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetwo
     }
 }
 
-resource spoke_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
-    parent: spoke_vnet
-    name: 'spoke-hub'
-    properties: {
-        remoteVirtualNetwork: {
-            id: hub_vnet.id
-        }
-        allowVirtualNetworkAccess: true
-        allowForwardedTraffic: true
-    }
-}
-
 resource hub_spoke_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
     parent: hub_vnet
     name: 'hub-spoke'
     properties: {
         remoteVirtualNetwork: {
             id: spoke_vnet.id
+        }
+        allowVirtualNetworkAccess: true
+        allowForwardedTraffic: true
+    }
+}
+
+resource spoke_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
+    parent: spoke_vnet
+    name: 'spoke-hub'
+    properties: {
+        remoteVirtualNetwork: {
+            id: hub_vnet.id
         }
         allowVirtualNetworkAccess: true
         allowForwardedTraffic: true
@@ -273,6 +273,44 @@ resource sqlMi 'Microsoft.Sql/managedInstances@2024-11-01-preview' = {
             azureADOnlyAuthentication: false
         }
     }
+}
+
+resource sqlmi_private_endpoint 'Microsoft.Network/privateEndpoints@2025-01-01' = {
+  name: '${sqlMiPrefix}-pe'
+  location: location
+  properties: {
+    subnet: {
+      id: onprem_subnet.id
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'sqlmi-connection'
+        properties: {
+          privateLinkServiceId: sqlMi.id
+          groupIds: [
+            'sqlManagedInstance' // required group for SQL MI
+          ]
+          requestMessage: 'Private endpoint connection for SQL MI'
+        }
+      }
+    ]
+  }
+}
+
+resource sqlmi_dns_zone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.database.windows.net'
+  location: 'global'
+}
+
+resource sqlmi_dns_link 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: sqlmi_dns_zone
+  name: '${onPremPrefix}-dnslink'
+  properties: {
+    virtualNetwork: {
+      id: onprem_vnet.id
+    }
+    registrationEnabled: false
+  }
 }
 
 resource sqlMi_subnet_routetable 'Microsoft.Network/routeTables@2025-01-01'= {
@@ -1045,6 +1083,45 @@ resource onprem_sql_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' = {
           destinationAddressPrefix: '10.2.1.0/24'
           access: 'Allow'
           priority: 110
+          direction: 'Outbound'
+        }
+      }
+      {
+        name: 'AG-Endpoint-Inbound'
+        properties: {
+          protocol: 'TCP'
+          sourcePortRange: '*'
+          destinationPortRange: '5022'
+          sourceAddressPrefix: '10.2.1.0/24'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 120
+          direction: 'Inbound'
+        }
+      }
+      {
+        name: 'AG-Endpoint-Outbound'
+        properties: {
+          protocol: 'TCP'
+          sourcePortRange: '*'
+          destinationPortRange: '5022'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: '10.2.1.0/24'
+          access: 'Allow'
+          priority: 130
+          direction: 'Outbound'
+        }
+      }
+      {
+        name: 'TDS-Redirect-Outbound'
+        properties: {
+          protocol: 'TCP'
+          sourcePortRange: '*'
+          destinationPortRange: '11000-11999'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: '10.2.1.0/24'
+          access: 'Allow'
+          priority: 140
           direction: 'Outbound'
         }
       }
