@@ -2,19 +2,6 @@
     Arc-enables a virtual machine.
 #>
 Configuration ArcConnect {
-    Param(
-        [Parameter(Mandatory)]
-        [String]$ResourceGroupName,
-
-        [Parameter(Mandatory)]
-        [String]$MachineName,
-
-        [Parameter(Mandatory)]
-        [String]$Location,
-
-        [Parameter(Mandatory)]
-        [String]$SubscriptionId
-    )
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
     Node "localhost" {
@@ -102,90 +89,63 @@ Configuration ArcConnect {
             }
         }
 
-        Script ScheduleArcOnboarding {
+        # Disable Windows Azure guest agent to allow Azure Arc installation
+        Script ScheduleDisableGuestAgent {
             DependsOn = '[Script]SetArcTestEnvVar'
             GetScript = {
-                $task = Get-ScheduledTask -TaskName 'ArcOnboardAfterDSC' -ErrorAction SilentlyContinue
+                $task = Get-ScheduledTask -TaskName 'DisableGuestAgentAfterDSC' -ErrorAction SilentlyContinue
                 if ($null -ne $task) { @{ Result = "Scheduled" } } else { @{ Result = "NotScheduled" } }
             }
             TestScript = {
-                $task = Get-ScheduledTask -TaskName 'ArcOnboardAfterDSC' -ErrorAction SilentlyContinue
+                $task = Get-ScheduledTask -TaskName 'DisableGuestAgentAfterDSC' -ErrorAction SilentlyContinue
                 return ($null -ne $task)
             }
             SetScript = {
                 try {
-                    Write-Verbose "Preparing path for Arc onboarding payload..."
+                    Write-Verbose "Preparing path for scheduled task payload..."
                     $prepDir    = 'C:\ArcPrep'
-                    $scriptPath = Join-Path $prepDir 'ArcOnboard.ps1'
+                    $scriptPath = Join-Path $prepDir 'DisableGuestAgent.ps1'
 
+                    # Ensure directory exists
                     if (-not (Test-Path -LiteralPath $prepDir)) {
                         New-Item -Path $prepDir -ItemType Directory -Force | Out-Null
                     }
 
-                    # Write payload script with Guest Agent disable + module install + Arc connect
+                    # Write payload script
                     @"
-Start-Transcript -Path 'C:\ArcPrep\ArcOnboard.log' -Append
-
+Start-Transcript -Path 'C:\ArcPrep\DisableGuestAgent.log' -Append
 try {
     Write-Output 'Disabling WindowsAzureGuestAgent...'
     Stop-Service WindowsAzureGuestAgent -Force -ErrorAction SilentlyContinue
     Set-Service WindowsAzureGuestAgent -StartupType Disabled
+    Write-Output 'Guest Agent disabled.'
 } catch {
-    Write-Warning "Failed to disable Guest Agent: `$($_.Exception.Message)"
+    Write-Error "Failed to disable Guest Agent: `$($_.Exception.Message)"
 }
-
-try {
-    Write-Output 'Installing Az.ConnectedMachine module...'
-    Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted -ErrorAction SilentlyContinue
-    Install-Module -Name Az.ConnectedMachine -Force -AllowClobber -ErrorAction Stop
-} catch {
-    Write-Error "Failed to install Az.ConnectedMachine: `$($_.Exception.Message)"
-    Stop-Transcript
-    exit 1
-}
-
-try {
-    Write-Output 'Connecting machine to Azure Arc...'
-    `$result = Connect-AzConnectedMachine `
-        -SubscriptionId '$using:SubscriptionId' `
-        -ResourceGroupName '$using:ResourceGroupName' `
-        -Name '$using:MachineName' `
-        -Location '$using:Location' `
-        -ErrorAction Stop
-
-    if (`$null -eq `$result) { throw 'Connect-AzConnectedMachine returned null.' }
-    Write-Output 'Arc connect succeeded.'
-} catch {
-    Write-Error "Arc connect failed: `$($_.Exception.Message)"
-    Stop-Transcript
-    exit 1
-}
-
 try {
     Write-Output 'Self-deleting scheduled task...'
-    schtasks /Delete /TN 'ArcOnboardAfterDSC' /F | Out-Null
+    schtasks /Delete /TN 'DisableGuestAgentAfterDSC' /F | Out-Null
 } catch {
     Write-Warning "Task self-delete failed: `$($_.Exception.Message)"
 }
-
 Stop-Transcript
 "@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
 
-                    Write-Verbose "Creating scheduled task to run Arc onboarding payload..."
+                    Write-Verbose "Creating scheduled task to run payload..."
                     $taskAction    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
-                    $taskTrigger   = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2)
+                    $taskTrigger   = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
                     $taskPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
                     $taskSettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
-                    Register-ScheduledTask -TaskName 'ArcOnboardAfterDSC' `
+                    Register-ScheduledTask -TaskName 'DisableGuestAgentAfterDSC' `
                         -Action $taskAction `
                         -Trigger $taskTrigger `
                         -Principal $taskPrincipal `
                         -Settings $taskSettings -Force | Out-Null
 
-                    Write-Verbose "Scheduled task created. It will disable Guest Agent, install module, connect to Arc, and then delete itself."
+                    Write-Verbose "Scheduled task created. It will disable Guest Agent and then delete itself."
                 } catch {
-                    Write-Error "Failed to schedule Arc onboarding task: $($_.Exception.Message)"
+                    Write-Error "Failed to schedule Guest Agent disable task: $($_.Exception.Message)"
                     throw
                 }
             }
