@@ -74,6 +74,21 @@ Configuration ArcConnect {
             }
         }
 
+        # AddFirewallRules
+        Script AddFirewallRules {
+            GetScript = { @{ Result = "FirewallRulesAdded" } }
+            TestScript = { return $false}
+            SetScript = {
+                # Firewall rules
+                Write-Host "Configuring firewall rules Arc..."
+                $fwRules = Get-NetFirewallRule | Select-Object -ExpandProperty DisplayName
+                if (-not ($fwRules -contains "Block Azure IMDS")) {
+                    New-NetFirewallRule -Name BlockAzureIMDS -DisplayName "Block Azure IMDS" -Enabled True -Profile Any -Direction Outbound -Action Block -RemoteAddress 169.254.169.254
+                    Write-Verbose "Firewall rule added: Block Azure IMDS"
+                }
+            }
+        }
+
         # Set environment variable to override the ARC on an Azure VM installation
         Script SetArcTestEnvVar {
             GetScript = {
