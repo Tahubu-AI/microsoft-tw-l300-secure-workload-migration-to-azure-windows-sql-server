@@ -1,9 +1,9 @@
 var resourceNameBase = 'tailspin${take(uniqueString(resourceGroup().id), 7)}'
 
 @description('The Id of the Azure AD User.')
-param azureAdUserId string = 'bfec0b43-31c7-48b2-a22a-c402ca6df7d6'
+param azureAdUserId string
 @description('The Login of the Azure AD User (ex: username@domain.onmicrosoft.com).')
-param azureAdUserLogin string = 'kyle@tahubu.com'
+param azureAdUserLogin string
 
 @description('The VM size for the virtual machines. Allows Intel and AMD 4-core options with premium and non-premium storage.')
 @allowed([
@@ -33,7 +33,7 @@ param sqlMiSku string = 'GP_Gen5'
 param sqlMiVCores int = 4
 
 @description('The branch of the GitHub repository to use for deployment scripts.')
-param repositoryBranch string = 'kb-lab-01'
+param repositoryBranch string = 'main'
 @description('The name of the GitHub repository containing deployment scripts.')
 param repositoryName string = 'microsoft-tw-l300-secure-workload-migration-to-azure-windows-sql-server'
 @description('The owner of the GitHub repository containing deployment scripts.')
@@ -275,6 +275,19 @@ resource sqlMi 'Microsoft.Sql/managedInstances@2024-11-01-preview' = {
     }
 }
 
+// Assign the "Azure Connected Machine Onboarding" role to the identity fo the deployment user
+resource sqlMiRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().name, azureAdUserId, 'SqlMiContributorRole')
+  properties: {
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '4939a1f6-9ae0-4e48-a1e0-f2cbe897382d' // SQL Managed Instance Contributor role
+    )
+    principalId: azureAdUserId
+    principalType: 'User'
+  }
+}
+/*
 resource sqlmi_private_endpoint 'Microsoft.Network/privateEndpoints@2025-01-01' = {
   name: '${sqlMiPrefix}-pe'
   location: location
@@ -288,7 +301,7 @@ resource sqlmi_private_endpoint 'Microsoft.Network/privateEndpoints@2025-01-01' 
         properties: {
           privateLinkServiceId: sqlMi.id
           groupIds: [
-            'sqlManagedInstance' // required group for SQL MI
+            'managedInstance'
           ]
           requestMessage: 'Private endpoint connection for SQL MI'
         }
@@ -305,6 +318,7 @@ resource sqlmi_dns_zone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
 resource sqlmi_dns_link 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
   parent: sqlmi_dns_zone
   name: '${onPremPrefix}-dnslink'
+  location: 'global'
   properties: {
     virtualNetwork: {
       id: onprem_vnet.id
@@ -312,6 +326,7 @@ resource sqlmi_dns_link 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2
     registrationEnabled: false
   }
 }
+*/
 
 resource sqlMi_subnet_routetable 'Microsoft.Network/routeTables@2025-01-01'= {
     name: '${sqlMiPrefix}-rt'
@@ -532,47 +547,33 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
         securityRules: [
             {
                 name: 'allow_tds_inbound'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow access to data via TDS'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     destinationPortRange: '1433'
                     sourceAddressPrefix: 'VirtualNetwork'
-                    destinationAddressPrefix: '10.2.1.0/24'
+                    destinationAddressPrefix: '*'
                     access: 'Allow'
                     priority: 1000
                     direction: 'Inbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'allow_redirect_inbound'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow inbound TDS redirect traffic to Managed Instance inside the virtual network'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     destinationPortRange: '11000-11999'
                     sourceAddressPrefix: 'VirtualNetwork'
-                    destinationAddressPrefix: '10.2.1.0/24'
+                    destinationAddressPrefix: '*'
                     access: 'Allow'
                     priority: 1100
                     direction: 'Inbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'allow_geodr_inbound'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow inbound GeoDR traffic inside the virtual network'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     destinationPortRange: '5022'
@@ -581,17 +582,11 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
                     access: 'Allow'
                     priority: 1200
                     direction: 'Inbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'deny_all_inbound'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Deny all other inbound traffic'
                     protocol: '*'
                     sourcePortRange: '*'
                     destinationPortRange: '*'
@@ -600,36 +595,24 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
                     access: 'Deny'
                     priority: 4096
                     direction: 'Inbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'allow_linkedserver_outbound'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow outbound linked server traffic inside the virtual network'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     destinationPortRange: '1433'
-                    sourceAddressPrefix: '10.2.1.0/24'
+                    sourceAddressPrefix: '*'
                     destinationAddressPrefix: 'VirtualNetwork'
                     access: 'Allow'
                     priority: 1000
                     direction: 'Outbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'allow_redirect_outbound'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow outbound TDS redirect traffic from Managed Instance inside the virtual network'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     destinationPortRange: '11000-11999'
@@ -638,59 +621,41 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
                     access: 'Allow'
                     priority: 1100
                     direction: 'Outbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'allow_geodr_outbound'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow outbound GeoDR traffic inside the virtual network'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     destinationPortRange: '5022'
-                    sourceAddressPrefix: '10.2.1.0/24'
+                    sourceAddressPrefix: '*'
                     destinationAddressPrefix: 'VirtualNetwork'
                     access: 'Allow'
                     priority: 1200
                     direction: 'Outbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'allow_privatelink_outbound'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow outbound Private Link traffic inside the virtual network'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     destinationPortRange: '443'
-                    sourceAddressPrefix: '10.2.1.0/24'
+                    sourceAddressPrefix: '*'
                     destinationAddressPrefix: 'VirtualNetwork'
                     access: 'Allow'
                     priority: 1300
                     direction: 'Outbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'allow_azurecloud_outbound'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow outbound traffic to Azure Cloud, port 443'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     destinationPortRange: '443'
-                    sourceAddressPrefix: '10.2.1.0/24'
+                    sourceAddressPrefix: '*'
                     destinationAddressPrefix: 'VirtualNetwork'
                     access: 'Allow'
                     priority: 1400
@@ -703,9 +668,7 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
             }
             {
                 name: 'deny_all_outbound'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Deny all other outbound traffic'
                     protocol: '*'
                     sourcePortRange: '*'
                     destinationPortRange: '*'
@@ -722,17 +685,14 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
             }
             {
                 name: 'Microsoft.Sql-managedInstances_UseOnly_mi-sqlmgmt-in-10-2-1-0-24-v10'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow MI provisioning Control Plane Deployment and Authentication Service'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     sourceAddressPrefix: 'SqlManagement'
-                    destinationAddressPrefix: '10.2.1.0/24'
+                    destinationAddressPrefix: '*'
                     access: 'Allow'
                     priority: 100
                     direction: 'Inbound'
-                    sourcePortRanges: []
                     destinationPortRanges: [
                         '9000'
                         '9003'
@@ -740,37 +700,28 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
                         '1440'
                         '1452'
                     ]
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'Microsoft.Sql-managedInstances_UseOnly_mi-corpsaw-in-10-2-1-0-24-v10'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow MI Supportability'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     sourceAddressPrefix: 'CorpNetSaw'
-                    destinationAddressPrefix: '10.2.1.0/24'
+                    destinationAddressPrefix: '*'
                     access: 'Allow'
                     priority: 101
                     direction: 'Inbound'
-                    sourcePortRanges: []
                     destinationPortRanges: [
                         '9000'
                         '9003'
                         '1440'
                     ]
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'Microsoft.Sql-managedInstances_UseOnly_mi-corppublic-in-10-2-1-0-24-v10'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow MI Supportability through Corpnet ranges'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     sourceAddressPrefix: 'CorpNetPublic'
@@ -789,9 +740,7 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
             }
             {
                 name: 'Microsoft.Sql-managedInstances_UseOnly_mi-healthprobe-in-10-2-1-0-24-v10'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow Azure Load Balancer inbound traffic'
                     protocol: '*'
                     sourcePortRange: '*'
                     destinationPortRange: '*'
@@ -800,17 +749,11 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
                     access: 'Allow'
                     priority: 103
                     direction: 'Inbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'Microsoft.Sql-managedInstances_UseOnly_mi-internal-in-10-2-1-0-24-v10'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow MI internal inbound traffic'
                     protocol: '*'
                     sourcePortRange: '*'
                     destinationPortRange: '*'
@@ -819,17 +762,11 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
                     access: 'Allow'
                     priority: 104
                     direction: 'Inbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'Microsoft.Sql-managedInstances_UseOnly_mi-services-out-10-2-1-0-24-v10'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow MI services outbound traffic over https'
                     protocol: 'Tcp'
                     sourcePortRange: '*'
                     sourceAddressPrefix: '10.2.1.0/24'
@@ -837,20 +774,15 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
                     access: 'Allow'
                     priority: 100
                     direction: 'Outbound'
-                    sourcePortRanges: []
                     destinationPortRanges: [
                         '443'
                         '12000'
                     ]
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
             {
                 name: 'Microsoft.Sql-managedInstances_UseOnly_mi-internal-out-10-2-1-0-24-v10'
-                type: 'Microsoft.Network/networkSecurityGroups/securityRules'
                 properties: {
-                    description: 'Allow MI internal outbound traffic'
                     protocol: '*'
                     sourcePortRange: '*'
                     destinationPortRange: '*'
@@ -859,10 +791,6 @@ resource sqlMi_subnet_nsg 'Microsoft.Network/networkSecurityGroups@2025-01-01' =
                     access: 'Allow'
                     priority: 101
                     direction: 'Outbound'
-                    sourcePortRanges: []
-                    destinationPortRanges: []
-                    sourceAddressPrefixes: []
-                    destinationAddressPrefixes: []
                 }
             }
         ]
@@ -918,9 +846,6 @@ resource onprem_windows_vm 'Microsoft.Compute/virtualMachines@2025-04-01' = {
     name: '${onPremWindowsVmPrefix}-vm'
     location: location
     tags: tags
-    identity: {
-        type: 'SystemAssigned'
-    }
     properties: {
         hardwareProfile: {
             vmSize: onpremVMSize
@@ -956,19 +881,6 @@ resource onprem_windows_vm 'Microsoft.Compute/virtualMachines@2025-04-01' = {
     }
 }
 
-// Assign the "Azure Connected Machine Onboarding" role to the VM's identity
-resource arcRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroup().name, onprem_windows_vm.name, 'ArcOnboardingRole')
-  properties: {
-    roleDefinitionId: subscriptionResourceId(
-      'Microsoft.Authorization/roleDefinitions',
-      'b64e21ea-ac4e-4cdf-9dc9-5b892992bee7' // Azure Connected Machine Onboarding role
-    )
-    principalId: onprem_windows_vm.identity.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
 resource onprem_windows_nic 'Microsoft.Network/networkInterfaces@2025-01-01' = {
     name: '${onPremWindowsVmPrefix}-nic'
     location: location
@@ -979,7 +891,7 @@ resource onprem_windows_nic 'Microsoft.Network/networkInterfaces@2025-01-01' = {
                 name: 'ipconfig1'
                 properties: {
                     subnet: {
-                        id: '${onprem_vnet.id}/subnets/default'
+                        id: onprem_subnet.id
                     }
                     privateIPAllocationMethod: 'Dynamic'
                 }
@@ -1016,9 +928,6 @@ resource onprem_sql_vm 'Microsoft.Compute/virtualMachines@2025-04-01' = {
     name: '${onPremSqlVmPrefix}-vm'
     location: location
     tags: tags
-    identity: {
-        type: 'SystemAssigned'
-    }
     properties: {
         hardwareProfile: {
             vmSize: onpremVMSize
@@ -1139,7 +1048,7 @@ resource onprem_sql_nic 'Microsoft.Network/networkInterfaces@2025-01-01' = {
                 name: 'ipconfig1'
                 properties: {
                     subnet: {
-                        id: '${onprem_vnet.id}/subnets/default'
+                        id: onprem_subnet.id
                     }
                     privateIPAllocationMethod: 'Dynamic'
                 }
@@ -1169,6 +1078,7 @@ resource onprem_sql_vm_ext 'Microsoft.Compute/virtualMachines/extensions@2025-04
             }
             configurationArguments: {
                 DbBackupFileUrl: databaseBackupFileUrl
+                DatabasePassword: labPassword
             }
         }
     }

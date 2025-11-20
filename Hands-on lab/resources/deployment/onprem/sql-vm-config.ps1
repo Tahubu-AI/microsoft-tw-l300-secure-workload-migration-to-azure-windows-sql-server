@@ -162,11 +162,11 @@ Configuration Main {
         Script EnableAlwaysOn {
             DependsOn = '[Script]InstallSqlServerModule', '[Service]SqlService'
             GetScript = {
-                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT SERVERPROPERTY('IsHadrEnabled') AS IsHadrEnabled"
+                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "SELECT SERVERPROPERTY('IsHadrEnabled') AS IsHadrEnabled"
                 @{ Result = $result.IsHadrEnabled }
             }
             TestScript = {
-                $status = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT SERVERPROPERTY('IsHadrEnabled') AS IsHadrEnabled"
+                $status = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "SELECT SERVERPROPERTY('IsHadrEnabled') AS IsHadrEnabled"
                 ($status.IsHadrEnabled -eq 1)
             }
             SetScript = {
@@ -178,48 +178,9 @@ Configuration Main {
             }
         }
 
-        Script EnableAgTraceFlags {
-            DependsOn = '[Script]InstallSqlServerModule'
-            GetScript = {
-                Import-Module SqlServer -ErrorAction Stop
-                $smo = 'Microsoft.SqlServer.Management.Smo.'
-                $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
-                $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']"
-                $instance = $wmi.GetSmoObject($uri)
-                @{ Result = $instance.ServerStartupOptions }
-            }
-            TestScript = {
-                Import-Module SqlServer -ErrorAction Stop
-                $smo = 'Microsoft.SqlServer.Management.Smo.'
-                $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
-                $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']"
-                $instance = $wmi.GetSmoObject($uri)
-                ($instance.ServerStartupOptions -contains "-T1800") -and
-                ($instance.ServerStartupOptions -contains "-T9567")
-            }
-            SetScript = {
-                Write-Verbose "Adding trace flags -T1800 and -T9567 to SQL Server startup parameters..."
-                Import-Module SqlServer -ErrorAction Stop
-                $smo = 'Microsoft.SqlServer.Management.Smo.'
-                $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
-                $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']"
-                $instance = $wmi.GetSmoObject($uri)
-
-                if (-not ($instance.ServerStartupOptions -contains "-T1800")) {
-                    $instance.ServerStartupOptions += "-T1800"
-                }
-                if (-not ($instance.ServerStartupOptions -contains "-T9567")) {
-                    $instance.ServerStartupOptions += "-T9567"
-                }
-
-                $instance.Alter()
-                Write-Verbose "Trace flags added. SQL Server service restart required."
-            }
-        }
-
         # Restart SQL Server service
         Script RestartSqlAfterConfig {
-            DependsOn = '[Script]ConfigureSqlDefaults','[Script]EnableSqlTcp','[Script]EnableAlwaysOn', '[Script]EnableAgTraceFlags'
+            DependsOn = '[Script]ConfigureSqlDefaults','[Script]EnableSqlTcp','[Script]EnableAlwaysOn'
             GetScript  = { @{ Result = "Restart required" } }
             TestScript = { $false }  # Always run
             SetScript  = {
@@ -232,17 +193,17 @@ Configuration Main {
         Script ConfigureSqlSaAccount {
             DependsOn = '[Service]SqlService','[Script]RestartSqlAfterConfig'
             GetScript = {
-                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT name, is_disabled FROM sys.sql_logins WHERE name = 'sa'"
+                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "SELECT name, is_disabled FROM sys.sql_logins WHERE name = 'sa'"
                 @{ Result = $result }
             }
             TestScript = {
-                $login = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT is_disabled FROM sys.sql_logins WHERE name = 'sa'"
+                $login = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "SELECT is_disabled FROM sys.sql_logins WHERE name = 'sa'"
                 ($login.is_disabled -eq 0)
             }
             SetScript = {
                 Write-Verbose "Enabling SA account and setting password..."
-                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "ALTER LOGIN sa ENABLE"
-                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "ALTER LOGIN sa WITH PASSWORD = '$using:DatabasePassword'"
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "ALTER LOGIN sa ENABLE"
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "ALTER LOGIN sa WITH PASSWORD = '$using:DatabasePassword'"
                 Write-Verbose "SA account enabled with new password."
             }
         }
@@ -251,17 +212,17 @@ Configuration Main {
         Script CreateMasterKey {
             DependsOn = '[Service]SqlService','[Script]RestartSqlAfterConfig'
             GetScript = {
-                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT name FROM sys.symmetric_keys WHERE name LIKE '%DatabaseMasterKey%'"
+                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "SELECT name FROM sys.symmetric_keys WHERE name LIKE '%DatabaseMasterKey%'"
                 @{ Result = $result }
             }
 
             TestScript = {
-                $hasMasterKey = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT COUNT(*) AS KeyCount FROM sys.symmetric_keys WHERE name LIKE '%DatabaseMasterKey%'"
+                $hasMasterKey = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "SELECT COUNT(*) AS KeyCount FROM sys.symmetric_keys WHERE name LIKE '%DatabaseMasterKey%'"
                 ($hasMasterKey.KeyCount -gt 0)
             }
             SetScript = {
                 Write-Verbose "Creating master key..."
-                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "CREATE MASTER KEY ENCRYPTION BY PASSWORD = '$using:DatabasePassword'"
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "CREATE MASTER KEY ENCRYPTION BY PASSWORD = '$using:DatabasePassword'"
                 Write-Verbose "Master key created."
             }
         }
@@ -294,23 +255,23 @@ Configuration Main {
         Script ImportAzureRootCerts {
             DependsOn = '[Service]SqlService', '[Script]DownloadAzureRootCerts'
             GetScript = {
-                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT name FROM sys.certificates WHERE name IN ('DigiCertPKI','MicrosoftPKI')"
+                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "SELECT name FROM sys.certificates WHERE name IN ('DigiCertPKI','MicrosoftPKI')"
                 @{ Result = $result }
             }
             TestScript = {
-                $certs = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT name FROM sys.certificates WHERE name IN ('DigiCertPKI','MicrosoftPKI')"
+                $certs = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "SELECT name FROM sys.certificates WHERE name IN ('DigiCertPKI','MicrosoftPKI')"
                 ($certs.Count -eq 2)
             }
             SetScript = {
                 Write-Verbose "Importing Azure-trusted root certificates into SQL Server..."
-                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query @"
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query @"
 CREATE CERTIFICATE [DigiCertPKI] FROM FILE = 'C:\certs\DigiCertGlobalRootG2.crt';
 DECLARE @CERTID int;
 SELECT @CERTID = CERT_ID('DigiCertPKI');
 EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
 "@
 
-                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query @"
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query @"
 CREATE CERTIFICATE [MicrosoftPKI] FROM FILE = 'C:\certs\Microsoft RSA Root Certificate Authority 2017.crt';
 DECLARE @CERTID int;
 SELECT @CERTID = CERT_ID('MicrosoftPKI');
@@ -346,12 +307,12 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
         Script RestoreToyStore {
             DependsOn = '[Script]DownloadDbBackup', '[Service]SqlService'
             GetScript = {
-                $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     SELECT name FROM sys.databases WHERE name = 'ToyStore'"
                 @{ Result = $dbExists }
             }
             TestScript = {
-                $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     SELECT name FROM sys.databases WHERE name = 'ToyStore'"
                 $dbExists.Count -gt 0
             }
@@ -359,7 +320,7 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
                 $backupFileName = Split-Path $using:DbBackupFileUrl -Leaf
                 $dbDestination = "C:\$backupFileName"
                 Write-Verbose "Restoring ToyStore database..."
-                $files = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $files = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     RESTORE FILELISTONLY FROM DISK = '$dbDestination'"
                 $relocateFiles = @()
                 foreach ($file in $files) {
@@ -386,12 +347,12 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
         Script RestoreCustomer360 {
             DependsOn = '[Script]DownloadDbBackup', '[Service]SqlService'
             GetScript = {
-                $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     SELECT name FROM sys.databases WHERE name = 'Customer360'"
                 @{ Result = $dbExists }
             }
             TestScript = {
-                $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     SELECT name FROM sys.databases WHERE name = 'Customer360'"
                 $dbExists.Count -gt 0
             }
@@ -399,7 +360,7 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
                 $backupFileName = Split-Path $using:DbBackupFileUrl -Leaf
                 $dbDestination = "C:\$backupFileName"
                 Write-Verbose "Restoring Customer360 database..."
-                $files = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $files = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     RESTORE FILELISTONLY FROM DISK = '$dbDestination'"
                 $relocateFiles = @()
                 foreach ($file in $files) {
@@ -426,24 +387,24 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
         Script AddBuiltinAdmins {
             DependsOn = '[Script]RestoreCustomer360','[Script]RestoreToyStore'
             GetScript = {
-                $loginExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $loginExists = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     SELECT name FROM sys.server_principals WHERE name = 'BUILTIN\Administrators'"
                 @{ Result = $loginExists }
             }
             TestScript = {
-                $loginExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $loginExists = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     SELECT name FROM sys.server_principals WHERE name = 'BUILTIN\Administrators'"
                 $loginExists.Count -gt 0
             }
             SetScript = {
                 Write-Verbose "Adding BUILTIN\Administrators to sysadmin role..."
-                $loginExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $loginExists = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     SELECT name FROM sys.server_principals WHERE name = 'BUILTIN\Administrators'"
                 if (-not $loginExists) {
-                    Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "
+                    Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                         CREATE LOGIN [BUILTIN\Administrators] FROM WINDOWS"
                 }
-                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     ALTER SERVER ROLE sysadmin ADD MEMBER [BUILTIN\Administrators]"
                 Write-Verbose "BUILTIN\Administrators added to sysadmin role."
             }
@@ -453,18 +414,18 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
         Script SetToyStoreRecoveryMode {
             DependsOn = '[Script]RestoreToyStore'
             GetScript = {
-                $model = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $model = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     SELECT recovery_model_desc FROM sys.databases WHERE name = 'ToyStore'"
                 @{ Result = $model }
             }
             TestScript = {
-                $model = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
+                $model = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     SELECT recovery_model_desc FROM sys.databases WHERE name = 'ToyStore'"
                 $model.recovery_model_desc -eq 'FULL'
             }
             SetScript = {
                 Write-Verbose "Setting ToyStore recovery model to FULL and running backup..."
-                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -TrustServerCertificate -Query "
                     ALTER DATABASE ToyStore SET RECOVERY FULL"
                 Backup-SqlDatabase -ServerInstance Localhost -Database ToyStore
                 Write-Verbose "ToyStore recovery model set to FULL."
@@ -477,18 +438,18 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
             GetScript = {
                 # Check current recovery model
                 $query = "SELECT recovery_model_desc FROM sys.databases WHERE name = 'Customer360';"
-                $result = Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query $query -ErrorAction SilentlyContinue
+                $result = Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -TrustServerCertificate -Query $query -ErrorAction SilentlyContinue
                 @{ Result = $result.recovery_model_desc }
             }
             TestScript = {
                 $query = "SELECT recovery_model_desc FROM sys.databases WHERE name = 'Customer360';"
-                $result = Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query $query -ErrorAction SilentlyContinue
+                $result = Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -TrustServerCertificate -Query $query -ErrorAction SilentlyContinue
                 return ($result.recovery_model_desc -eq 'SIMPLE')
             }
             SetScript = {
                 Write-Verbose "Setting Customer360 recovery model to SIMPLE..."
                 $query = "ALTER DATABASE [Customer360] SET RECOVERY SIMPLE;"
-                Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query $query -ErrorAction Stop
+                Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -TrustServerCertificate -Query $query -ErrorAction Stop
                 Write-Verbose "Customer360 recovery model set to SIMPLE."
             }
         }
@@ -518,7 +479,7 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
                 }
 
                 $query = "BACKUP DATABASE [ToyStore] TO DISK = N'$backupPath' WITH INIT, FORMAT, NAME = 'ToyStore-FullBackup';"
-                Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query $query -ErrorAction Stop
+                Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -TrustServerCertificate -Query $query -ErrorAction Stop
                 Write-Verbose "Full backup of ToyStore database completed."
             }
         }
@@ -526,40 +487,38 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
         # AddFirewallRules
         Script AddFirewallRules {
             GetScript = { @{ Result = "FirewallRulesAdded" } }
-            TestScript = { return $false}
+            TestScript = { return $false }
             SetScript = {
-                # Firewall rules
                 Write-Host "Configuring firewall rules for Arc, SQL, and AOG..."
-                $fwRules = Get-NetFirewallRule | Select-Object -ExpandProperty DisplayName
-                if (-not ($fwRules -contains "block_azure_imds")) {
+                if (-not (Get-NetFirewallRule -Name "block_azure_imds" -ErrorAction SilentlyContinue)) {
                     New-NetFirewallRule -Name block_azure_imds -DisplayName "Block Azure IMDS" -Enabled True -Profile Any -Direction Outbound -Action Block -RemoteAddress 169.254.169.254
                     Write-Verbose "Firewall rule added: Block Azure IMDS"
                 }
-                if (-not ($fwRules -contains "sql_server_inbound")) {
+                if (-not (Get-NetFirewallRule -Name "sql_server_inbound" -ErrorAction SilentlyContinue)) {
                     New-NetFirewallRule -Name sql_server_inbound -DisplayName "SQL Server Inbound" -Direction Inbound -Protocol TCP -LocalPort 1433 -Action Allow
                     Write-Host "Firewall rule added: SQL Server Inbound (1433)"
                 }
-                if (-not ($fwRules -contains "sql_server_outbound")) {
+                if (-not (Get-NetFirewallRule -Name "sql_server_outbound" -ErrorAction SilentlyContinue)) {
                     New-NetFirewallRule -Name sql_server_outbound -DisplayName "SQL Server Outbound" -Direction Outbound -Protocol TCP -LocalPort 1433 -Action Allow -Profile Any
                     Write-Host "Firewall rule added: SQL Server Outbound (1433)"
                 }
-                if (-not ($fwRules -contains "sql_ag_endpoint_inbound")) {
+                if (-not (Get-NetFirewallRule -Name "sql_ag_endpoint_inbound" -ErrorAction SilentlyContinue)) {
                     New-NetFirewallRule -Name sql_ag_endpoint_inbound -DisplayName "SQL AG Endpoint Inbound" -Direction Inbound -Profile Any -Action Allow -LocalPort 5022 -Protocol TCP
                     Write-Host "Firewall rule added: SQL AG Endpoint Inbound (5022)"
                 }
-                if (-not ($fwRules -contains "sql_ag_endpoint_outbound")) {
+                if (-not (Get-NetFirewallRule -Name "sql_ag_endpoint_outbound" -ErrorAction SilentlyContinue)) {
                     New-NetFirewallRule -Name sql_ag_endpoint_outbound -DisplayName "SQL AG Endpoint Outbound" -Direction Outbound -Profile Any -Action Allow -LocalPort 5022 -Protocol TCP
                     Write-Host "Firewall rule added: SQL AG Endpoint Outbound (5022)"
                 }
-                if (-not ($fwRules -contains "sql_ag_lb_probe_inbound")) {
+                if (-not (Get-NetFirewallRule -Name "sql_ag_lb_probe_inbound" -ErrorAction SilentlyContinue)) {
                     New-NetFirewallRule -Name sql_ag_lb_probe_inbound -DisplayName "SQL AG Load Balancer Probe Port" -Direction Inbound -Protocol TCP -LocalPort 59999 -Action Allow
                     Write-Host "Firewall rule added: SQL AG Load Balancer Probe Port (59999)"
                 }
-                if (-not ($fwRules -contains "sql_tds_redirect_outbound")) {
+                if (-not (Get-NetFirewallRule -Name "sql_tds_redirect_outbound" -ErrorAction SilentlyContinue)) {
                     New-NetFirewallRule -Name sql_tds_redirect_outbound -DisplayName "SQL TDS Redirect Outbound" -Direction Outbound -Profile Any -Action Allow -LocalPort 11000-11999 -Protocol TCP
                     Write-Host "Firewall rule added: SQL TDS Redirect Outbound (11000-11999)"
                 }
-                if (-not ($fwRules -contains "azure_arc_outbound_https")) {
+                if (-not (Get-NetFirewallRule -Name "azure_arc_outbound_https" -ErrorAction SilentlyContinue)) {
                     New-NetFirewallRule -Name azure_arc_outbound_https -DisplayName "Azure Arc Outbound HTTPS" -Direction Outbound -Protocol TCP -LocalPort 443 -Action Allow -Profile Any
                     Write-Host "Firewall rule added: Azure Arc Outbound HTTPS (443)"
                 }

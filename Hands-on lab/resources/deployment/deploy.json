@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "565988859145774184"
+      "templateHash": "13403912206217585301"
     }
   },
   "parameters": {
@@ -127,16 +127,19 @@
           "addressPrefixes": [
             "10.0.0.0/16"
           ]
-        },
-        "subnets": [
-          {
-            "name": "default",
-            "properties": {
-              "addressPrefix": "10.0.0.0/24"
-            }
-          }
-        ]
+        }
       }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2025-01-01",
+      "name": "[format('{0}/{1}', format('{0}-vnet', variables('onPremPrefix')), 'default')]",
+      "properties": {
+        "addressPrefix": "10.0.0.0/24"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]"
+      ]
     },
     {
       "type": "Microsoft.Network/virtualNetworks",
@@ -248,10 +251,10 @@
     {
       "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
       "apiVersion": "2025-01-01",
-      "name": "[format('{0}/{1}', format('{0}-vnet', variables('spokeNamePrefix')), 'spoke-hub')]",
+      "name": "[format('{0}/{1}', format('{0}-vnet', variables('hubNamePrefix')), 'hub-spoke')]",
       "properties": {
         "remoteVirtualNetwork": {
-          "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('hubNamePrefix')))]"
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix')))]"
         },
         "allowVirtualNetworkAccess": true,
         "allowForwardedTraffic": true
@@ -264,10 +267,10 @@
     {
       "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
       "apiVersion": "2025-01-01",
-      "name": "[format('{0}/{1}', format('{0}-vnet', variables('hubNamePrefix')), 'hub-spoke')]",
+      "name": "[format('{0}/{1}', format('{0}-vnet', variables('spokeNamePrefix')), 'spoke-hub')]",
       "properties": {
         "remoteVirtualNetwork": {
-          "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix')))]"
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('hubNamePrefix')))]"
         },
         "allowVirtualNetworkAccess": true,
         "allowForwardedTraffic": true
@@ -335,6 +338,16 @@
       "dependsOn": [
         "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix')))]"
       ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceGroup().name, parameters('azureAdUserId'), 'SqlMiContributorRole')]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4939a1f6-9ae0-4e48-a1e0-f2cbe897382d')]",
+        "principalId": "[parameters('azureAdUserId')]",
+        "principalType": "User"
+      }
     },
     {
       "type": "Microsoft.Network/routeTables",
@@ -558,47 +571,33 @@
         "securityRules": [
           {
             "name": "allow_tds_inbound",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow access to data via TDS",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "destinationPortRange": "1433",
               "sourceAddressPrefix": "VirtualNetwork",
-              "destinationAddressPrefix": "10.2.1.0/24",
+              "destinationAddressPrefix": "*",
               "access": "Allow",
               "priority": 1000,
-              "direction": "Inbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Inbound"
             }
           },
           {
             "name": "allow_redirect_inbound",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow inbound TDS redirect traffic to Managed Instance inside the virtual network",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "destinationPortRange": "11000-11999",
               "sourceAddressPrefix": "VirtualNetwork",
-              "destinationAddressPrefix": "10.2.1.0/24",
+              "destinationAddressPrefix": "*",
               "access": "Allow",
               "priority": 1100,
-              "direction": "Inbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Inbound"
             }
           },
           {
             "name": "allow_geodr_inbound",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow inbound GeoDR traffic inside the virtual network",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "destinationPortRange": "5022",
@@ -606,18 +605,12 @@
               "destinationAddressPrefix": "10.2.1.0/24",
               "access": "Allow",
               "priority": 1200,
-              "direction": "Inbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Inbound"
             }
           },
           {
             "name": "deny_all_inbound",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Deny all other inbound traffic",
               "protocol": "*",
               "sourcePortRange": "*",
               "destinationPortRange": "*",
@@ -625,37 +618,25 @@
               "destinationAddressPrefix": "*",
               "access": "Deny",
               "priority": 4096,
-              "direction": "Inbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Inbound"
             }
           },
           {
             "name": "allow_linkedserver_outbound",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow outbound linked server traffic inside the virtual network",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "destinationPortRange": "1433",
-              "sourceAddressPrefix": "10.2.1.0/24",
+              "sourceAddressPrefix": "*",
               "destinationAddressPrefix": "VirtualNetwork",
               "access": "Allow",
               "priority": 1000,
-              "direction": "Outbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Outbound"
             }
           },
           {
             "name": "allow_redirect_outbound",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow outbound TDS redirect traffic from Managed Instance inside the virtual network",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "destinationPortRange": "11000-11999",
@@ -663,60 +644,42 @@
               "destinationAddressPrefix": "VirtualNetwork",
               "access": "Allow",
               "priority": 1100,
-              "direction": "Outbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Outbound"
             }
           },
           {
             "name": "allow_geodr_outbound",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow outbound GeoDR traffic inside the virtual network",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "destinationPortRange": "5022",
-              "sourceAddressPrefix": "10.2.1.0/24",
+              "sourceAddressPrefix": "*",
               "destinationAddressPrefix": "VirtualNetwork",
               "access": "Allow",
               "priority": 1200,
-              "direction": "Outbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Outbound"
             }
           },
           {
             "name": "allow_privatelink_outbound",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow outbound Private Link traffic inside the virtual network",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "destinationPortRange": "443",
-              "sourceAddressPrefix": "10.2.1.0/24",
+              "sourceAddressPrefix": "*",
               "destinationAddressPrefix": "VirtualNetwork",
               "access": "Allow",
               "priority": 1300,
-              "direction": "Outbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Outbound"
             }
           },
           {
             "name": "allow_azurecloud_outbound",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow outbound traffic to Azure Cloud, port 443",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "destinationPortRange": "443",
-              "sourceAddressPrefix": "10.2.1.0/24",
+              "sourceAddressPrefix": "*",
               "destinationAddressPrefix": "VirtualNetwork",
               "access": "Allow",
               "priority": 1400,
@@ -729,9 +692,7 @@
           },
           {
             "name": "deny_all_outbound",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Deny all other outbound traffic",
               "protocol": "*",
               "sourcePortRange": "*",
               "destinationPortRange": "*",
@@ -748,55 +709,43 @@
           },
           {
             "name": "Microsoft.Sql-managedInstances_UseOnly_mi-sqlmgmt-in-10-2-1-0-24-v10",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow MI provisioning Control Plane Deployment and Authentication Service",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "sourceAddressPrefix": "SqlManagement",
-              "destinationAddressPrefix": "10.2.1.0/24",
+              "destinationAddressPrefix": "*",
               "access": "Allow",
               "priority": 100,
               "direction": "Inbound",
-              "sourcePortRanges": [],
               "destinationPortRanges": [
                 "9000",
                 "9003",
                 "1438",
                 "1440",
                 "1452"
-              ],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              ]
             }
           },
           {
             "name": "Microsoft.Sql-managedInstances_UseOnly_mi-corpsaw-in-10-2-1-0-24-v10",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow MI Supportability",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "sourceAddressPrefix": "CorpNetSaw",
-              "destinationAddressPrefix": "10.2.1.0/24",
+              "destinationAddressPrefix": "*",
               "access": "Allow",
               "priority": 101,
               "direction": "Inbound",
-              "sourcePortRanges": [],
               "destinationPortRanges": [
                 "9000",
                 "9003",
                 "1440"
-              ],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              ]
             }
           },
           {
             "name": "Microsoft.Sql-managedInstances_UseOnly_mi-corppublic-in-10-2-1-0-24-v10",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow MI Supportability through Corpnet ranges",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "sourceAddressPrefix": "CorpNetPublic",
@@ -815,9 +764,7 @@
           },
           {
             "name": "Microsoft.Sql-managedInstances_UseOnly_mi-healthprobe-in-10-2-1-0-24-v10",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow Azure Load Balancer inbound traffic",
               "protocol": "*",
               "sourcePortRange": "*",
               "destinationPortRange": "*",
@@ -825,18 +772,12 @@
               "destinationAddressPrefix": "10.2.1.0/24",
               "access": "Allow",
               "priority": 103,
-              "direction": "Inbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Inbound"
             }
           },
           {
             "name": "Microsoft.Sql-managedInstances_UseOnly_mi-internal-in-10-2-1-0-24-v10",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow MI internal inbound traffic",
               "protocol": "*",
               "sourcePortRange": "*",
               "destinationPortRange": "*",
@@ -844,18 +785,12 @@
               "destinationAddressPrefix": "10.2.1.0/24",
               "access": "Allow",
               "priority": 104,
-              "direction": "Inbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Inbound"
             }
           },
           {
             "name": "Microsoft.Sql-managedInstances_UseOnly_mi-services-out-10-2-1-0-24-v10",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow MI services outbound traffic over https",
               "protocol": "Tcp",
               "sourcePortRange": "*",
               "sourceAddressPrefix": "10.2.1.0/24",
@@ -863,20 +798,15 @@
               "access": "Allow",
               "priority": 100,
               "direction": "Outbound",
-              "sourcePortRanges": [],
               "destinationPortRanges": [
                 "443",
                 "12000"
-              ],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              ]
             }
           },
           {
             "name": "Microsoft.Sql-managedInstances_UseOnly_mi-internal-out-10-2-1-0-24-v10",
-            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
             "properties": {
-              "description": "Allow MI internal outbound traffic",
               "protocol": "*",
               "sourcePortRange": "*",
               "destinationPortRange": "*",
@@ -884,11 +814,7 @@
               "destinationAddressPrefix": "10.2.1.0/24",
               "access": "Allow",
               "priority": 101,
-              "direction": "Outbound",
-              "sourcePortRanges": [],
-              "destinationPortRanges": [],
-              "sourceAddressPrefixes": [],
-              "destinationAddressPrefixes": []
+              "direction": "Outbound"
             }
           }
         ]
@@ -945,9 +871,6 @@
       "name": "[format('{0}-vm', variables('onPremWindowsVmPrefix'))]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
-      "identity": {
-        "type": "SystemAssigned"
-      },
       "properties": {
         "hardwareProfile": {
           "vmSize": "[parameters('onpremVMSize')]"
@@ -984,19 +907,6 @@
       ]
     },
     {
-      "type": "Microsoft.Authorization/roleAssignments",
-      "apiVersion": "2022-04-01",
-      "name": "[guid(resourceGroup().name, format('{0}-vm', variables('onPremWindowsVmPrefix')), 'ArcOnboardingRole')]",
-      "properties": {
-        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b64e21ea-ac4e-4cdf-9dc9-5b892992bee7')]",
-        "principalId": "[reference(resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onPremWindowsVmPrefix'))), '2025-04-01', 'full').identity.principalId]",
-        "principalType": "ServicePrincipal"
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-vm', variables('onPremWindowsVmPrefix')))]"
-      ]
-    },
-    {
       "type": "Microsoft.Network/networkInterfaces",
       "apiVersion": "2025-01-01",
       "name": "[format('{0}-nic', variables('onPremWindowsVmPrefix'))]",
@@ -1008,7 +918,7 @@
             "name": "ipconfig1",
             "properties": {
               "subnet": {
-                "id": "[format('{0}/subnets/default', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix'))))]"
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', format('{0}-vnet', variables('onPremPrefix')), 'default')]"
               },
               "privateIPAllocationMethod": "Dynamic"
             }
@@ -1016,7 +926,7 @@
         ]
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]"
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', format('{0}-vnet', variables('onPremPrefix')), 'default')]"
       ]
     },
     {
@@ -1049,9 +959,6 @@
       "name": "[format('{0}-vm', variables('onPremSqlVmPrefix'))]",
       "location": "[variables('location')]",
       "tags": "[variables('tags')]",
-      "identity": {
-        "type": "SystemAssigned"
-      },
       "properties": {
         "hardwareProfile": {
           "vmSize": "[parameters('onpremVMSize')]"
@@ -1120,6 +1027,45 @@
               "priority": 110,
               "direction": "Outbound"
             }
+          },
+          {
+            "name": "AG-Endpoint-Inbound",
+            "properties": {
+              "protocol": "TCP",
+              "sourcePortRange": "*",
+              "destinationPortRange": "5022",
+              "sourceAddressPrefix": "10.2.1.0/24",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 120,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "AG-Endpoint-Outbound",
+            "properties": {
+              "protocol": "TCP",
+              "sourcePortRange": "*",
+              "destinationPortRange": "5022",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "10.2.1.0/24",
+              "access": "Allow",
+              "priority": 130,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "TDS-Redirect-Outbound",
+            "properties": {
+              "protocol": "TCP",
+              "sourcePortRange": "*",
+              "destinationPortRange": "11000-11999",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "10.2.1.0/24",
+              "access": "Allow",
+              "priority": 140,
+              "direction": "Outbound"
+            }
           }
         ]
       }
@@ -1136,7 +1082,7 @@
             "name": "ipconfig1",
             "properties": {
               "subnet": {
-                "id": "[format('{0}/subnets/default', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix'))))]"
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', format('{0}-vnet', variables('onPremPrefix')), 'default')]"
               },
               "privateIPAllocationMethod": "Dynamic"
             }
@@ -1148,7 +1094,7 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', variables('onPremSqlVmPrefix')))]",
-        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]"
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', format('{0}-vnet', variables('onPremPrefix')), 'default')]"
       ]
     },
     {
@@ -1169,7 +1115,8 @@
             "function": "Main"
           },
           "configurationArguments": {
-            "DbBackupFileUrl": "[variables('databaseBackupFileUrl')]"
+            "DbBackupFileUrl": "[variables('databaseBackupFileUrl')]",
+            "DatabasePassword": "[variables('labPassword')]"
           }
         }
       },
