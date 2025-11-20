@@ -15,10 +15,10 @@ In this exercise, you will Azure Arc-enable a Windows Server VM that Tailspin ha
 
 After you complete this lab, you will be able to:
 
-* Configure an on-prem VM to be Arc-enabled
-* Manage an Arc-enable Virtual Machine via the Azure Portal
+- Configure an on-prem VM to be Arc-enabled
+- Manage an Arc-enable Virtual Machine via the Azure Portal
 
 ## Lab Duration
 
-* **Estimated Time:** 45 minutes
+- **Estimated Time:** 45 minutes
   
