@@ -512,7 +512,6 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
                 $backupDir = "C:\Database\Backup"
                 $backupPath = "$backupDir\ToyStore_full.bak"
 
-                # Ensure the backup directory exists
                 if (-not (Test-Path $backupDir)) {
                     New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
                 }
@@ -599,7 +598,6 @@ EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
                     $prepDir    = 'C:\ArcPrep'
                     $scriptPath = Join-Path $prepDir 'DisableGuestAgent.ps1'
 
-                    # Ensure directory exists
                     if (-not (Test-Path -LiteralPath $prepDir)) {
                         New-Item -Path $prepDir -ItemType Directory -Force | Out-Null
                     }
