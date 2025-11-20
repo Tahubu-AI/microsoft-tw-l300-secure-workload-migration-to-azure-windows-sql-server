@@ -138,7 +138,7 @@ Configuration Main {
             DependsOn = '[Script]InstallSqlServerModule'
             GetScript = { @{ Result = "SqlTcp" } }
             TestScript = {
-                Import-Module SqlServer -ErrrorAction Stop
+                Import-Module SqlServer -ErrorAction Stop
                 $smo = 'Microsoft.SqlServer.Management.Smo.'
                 $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
                 $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']/ServerProtocol[@Name='Tcp']"
