@@ -11,7 +11,10 @@
 Configuration Main {
     Param(
         [Parameter(Mandatory)]
-        [String]$DbBackupFileUrl
+        [String]$DbBackupFileUrl,
+
+        [Parameter(Mandatory)]
+        [String] $DatabasePassword
     )
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
 
@@ -19,18 +22,16 @@ Configuration Main {
         # Disable the Server Manager from starting on login
         Script DisableServerManager {
             GetScript = {
-                # Return current state for reporting
                 $task = Get-ScheduledTask -TaskName 'ServerManager'
                 @{ Result = $task.State }
             }
             TestScript = {
-                # Check if the task is already disabled
                 $task = Get-ScheduledTask -TaskName 'ServerManager'
                 return ($task.State -eq 'Disabled')
             }
             SetScript = {
-                # Disable the Server Manager scheduled task
                 Get-ScheduledTask -TaskName 'ServerManager' | Disable-ScheduledTask -ErrorAction SilentlyContinue
+                Write-Verbose "Server Manager scheduled task disabled..."
             }
         }
 
@@ -47,21 +48,13 @@ Configuration Main {
                         HubsSidebarEnabled           = $props.HubsSidebarEnabled
                     }
                 }
-                else {
-                    @{ Result = "Edge policy key not present" }
-                }
+                else { @{ Result = "Edge policy key not present" } }
             }
             TestScript = {
                 $EdgePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
-
-                # If the key doesn't exist, we need to run SetScript
-                if (-not (Test-Path $EdgePolicyPath)) {
-                    return $false
-                }
+                if (-not (Test-Path $EdgePolicyPath)) { return $false }
 
                 $props = Get-ItemProperty -Path $EdgePolicyPath -ErrorAction SilentlyContinue
-
-                # Check if all desired values are already set
                 return (
                     ($props.HideFirstRunExperience -eq 1) -and
                     ($props.DefaultBrowserSettingEnabled -eq 0) -and
@@ -69,10 +62,7 @@ Configuration Main {
                 )
             }
             SetScript = {
-                # Registry path for Edge policy
                 $EdgePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
-
-                # Create the key if it doesn't exist
                 if (-not (Test-Path $EdgePolicyPath)) {
                     New-Item -Path $EdgePolicyPath -Force | Out-Null
                 }
@@ -80,8 +70,7 @@ Configuration Main {
                 Set-ItemProperty -Path $EdgePolicyPath -Name "HideFirstRunExperience" -Type DWord -Value 1 -ErrorAction SilentlyContinue
                 Set-ItemProperty -Path $EdgePolicyPath -Name "DefaultBrowserSettingEnabled" -Type DWord -Value 0 -ErrorAction SilentlyContinue
                 Set-ItemProperty -Path $EdgePolicyPath -Name "HubsSidebarEnabled" -Type DWord -Value 0 -ErrorAction SilentlyContinue
-
-                Write-Verbose "Microsoft Edge First Run Experience disabled successfully."
+                Write-Verbose "Microsoft Edge First Run Experience disabled."
             }
         }
 
@@ -94,64 +83,19 @@ Configuration Main {
             }
         }
 
-        # Load SQL modules
-        Script LoadSqlModules {
+        Script InstallSqlServerModule {
             GetScript = {
-                # Report whether the module is loaded
-                $loaded = Get-Module -Name sqlps -ListAvailable
-                @{ Result = if ($loaded) { "sqlps available" } else { "sqlps missing" } }
+                $module = Get-Module -ListAvailable -Name SqlServer
+                @{ Result = $module }
             }
             TestScript = {
-                # Return $true if both module and assembly are available
-                $moduleOk = (Get-Module -Name sqlps -ListAvailable) -ne $null
-                $assemblyOk = [AppDomain]::CurrentDomain.GetAssemblies().FullName -match "Microsoft.SqlServer.Smo"
-                $moduleOk -and $assemblyOk
+                $module = Get-Module -ListAvailable -Name SqlServer
+                $null -ne $module
             }
             SetScript = {
-                Write-Verbose "Loading SQLPS module and SMO assemblies..."
-                Import-Module "sqlps" -DisableNameChecking -ErrorAction Stop
-                [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo") | Out-Null
-            }
-        }
-
-        # Configure SQL defaults and Mixed Auth
-        Script ConfigureSqlDefaults {
-            DependsOn = '[Script]LoadSqlModules'
-            GetScript = { @{ Result = "SQLDefaults" } }
-            TestScript = {
-                $sqlesq = New-Object ('Microsoft.SqlServer.Management.Smo.Server') Localhost
-                ($sqlesq.Settings.LoginMode -eq [Microsoft.SqlServer.Management.Smo.ServerLoginMode]::Mixed)
-            }
-            SetScript = {
-                Write-Verbose "Configuring SQL defaults and enabling Mixed Authentication..."
-                $sqlesq = New-Object ('Microsoft.SqlServer.Management.Smo.Server') Localhost
-                $sqlesq.Settings.LoginMode = [Microsoft.SqlServer.Management.Smo.ServerLoginMode]::Mixed
-                $sqlesq.Settings.DefaultFile = "C:\Database\Data"
-                $sqlesq.Settings.DefaultLog = "C:\Database\Logs"
-                $sqlesq.Settings.BackupDirectory = "C:\Database\Backup"
-                $sqlesq.Alter()
-            }
-        }
-
-        # Enable TCP protocol
-        Script EnableSqlTcp {
-            DependsOn = '[Script]LoadSqlModules'
-            GetScript = { @{ Result = "SqlTcp" } }
-            TestScript = {
-                $smo = 'Microsoft.SqlServer.Management.Smo.'
-                $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
-                $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']/ServerProtocol[@Name='Tcp']"
-                $Tcp = $wmi.GetSmoObject($uri)
-                $Tcp.IsEnabled
-            }
-            SetScript = {
-                Write-Verbose "Enabling TCP protocol for SQL Server..."
-                $smo = 'Microsoft.SqlServer.Management.Smo.'
-                $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
-                $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']/ServerProtocol[@Name='Tcp']"
-                $Tcp = $wmi.GetSmoObject($uri)
-                $Tcp.IsEnabled = $true
-                $Tcp.Alter()
+                Write-Verbose "Installing SqlServer PowerShell module..."
+                Install-Module -Name SqlServer -Force -Scope AllUsers
+                Write-Verbose "SqlServer module installed."
             }
         }
 
@@ -162,10 +106,120 @@ Configuration Main {
             State       = 'Running'
         }
 
+        # Configure SQL defaults and Mixed Auth
+        Script ConfigureSqlDefaults {
+            DependsOn = '[Script]InstallSqlServerModule', '[Service]SqlService'
+            GetScript = { @{ Result = "SQLDefaults" } }
+            TestScript = {
+                Import-Module SqlServer -ErrorAction Stop
+                $server = New-Object Microsoft.SqlServer.Management.Smo.Server Localhost
+                $loginModeOk = ($server.Settings.LoginMode -eq [Microsoft.SqlServer.Management.Smo.ServerLoginMode]::Mixed)
+                $defaultsOk  = ($server.Settings.DefaultFile -eq "C:\Database\Data" -and
+                                $server.Settings.DefaultLog -eq "C:\Database\Logs" -and
+                                $server.Settings.BackupDirectory -eq "C:\Database\Backup")
+                $loginModeOk -and $defaultsOk
+            }
+            SetScript = {
+                Write-Verbose "Configuring SQL defaults and enabling Mixed Authentication..."
+                Import-Module SqlServer -ErrorAction Stop
+                $server = New-Object Microsoft.SqlServer.Management.Smo.Server Localhost
+                $server.Settings.LoginMode = [Microsoft.SqlServer.Management.Smo.ServerLoginMode]::Mixed
+                $server.Settings.DefaultFile = "C:\Database\Data"
+                $server.Settings.DefaultLog = "C:\Database\Logs"
+                $server.Settings.BackupDirectory = "C:\Database\Backup"
+                $server.Alter()
+                Write-Verbose "SQL defaults configured and Mixed Authentication enabled."
+            }
+        }
+
+        # Enable TCP protocol
+        Script EnableSqlTcp {
+            DependsOn = '[Script]InstallSqlServerModule'
+            GetScript = { @{ Result = "SqlTcp" } }
+            TestScript = {
+                Import-Module SqlServer -ErrrorAction Stop
+                $smo = 'Microsoft.SqlServer.Management.Smo.'
+                $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
+                $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']/ServerProtocol[@Name='Tcp']"
+                $Tcp = $wmi.GetSmoObject($uri)
+                $Tcp.IsEnabled
+            }
+            SetScript = {
+                Write-Verbose "Enabling TCP protocol for SQL Server..."
+                Import-Module SqlServer -ErrorAction Stop
+                $smo = 'Microsoft.SqlServer.Management.Smo.'
+                $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
+                $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']/ServerProtocol[@Name='Tcp']"
+                $Tcp = $wmi.GetSmoObject($uri)
+                $Tcp.IsEnabled = $true
+                $Tcp.Alter()
+                Write-Verbose "TCP protocol for SQL Server enabled."
+            }
+        }
+
+        # Enable Always On availability groups
+        Script EnableAlwaysOn {
+            DependsOn = '[Script]InstallSqlServerModule', '[Service]SqlService'
+            GetScript = {
+                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT SERVERPROPERTY('IsHadrEnabled') AS IsHadrEnabled"
+                @{ Result = $result.IsHadrEnabled }
+            }
+            TestScript = {
+                $status = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT SERVERPROPERTY('IsHadrEnabled') AS IsHadrEnabled"
+                ($status.IsHadrEnabled -eq 1)
+            }
+            SetScript = {
+                Write-Verbose "Importing SqlServer module..."
+                Import-Module SqlServer
+                Write-Verbose "Enabling Always On Availability Groups..."
+                Enable-SqlAlwaysOn -ServerInstance "Localhost" -Force
+                Write-Verbose "Always On Availability Groups enabled. SQL service restart required."
+            }
+        }
+
+        Script EnableAgTraceFlags {
+            DependsOn = '[Service]InstallSqlServerModule'
+            GetScript = {
+                Import-Module SqlServer -ErrorAction Stop
+                $smo = 'Microsoft.SqlServer.Management.Smo.'
+                $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
+                $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']"
+                $instance = $wmi.GetSmoObject($uri)
+                @{ Result = $instance.ServerStartupOptions }
+            }
+            TestScript = {
+                Import-Module SqlServer -ErrorAction Stop
+                $smo = 'Microsoft.SqlServer.Management.Smo.'
+                $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
+                $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']"
+                $instance = $wmi.GetSmoObject($uri)
+                ($instance.ServerStartupOptions -contains "-T1800") -and
+                ($instance.ServerStartupOptions -contains "-T9567")
+            }
+            SetScript = {
+                Write-Verbose "Adding trace flags -T1800 and -T9567 to SQL Server startup parameters..."
+                Import-Module SqlServer -ErrorAction Stop
+                $smo = 'Microsoft.SqlServer.Management.Smo.'
+                $wmi = New-Object ($smo + 'Wmi.ManagedComputer')
+                $uri = "ManagedComputer[@Name='" + (Get-Item env:\computername).Value + "']/ServerInstance[@Name='MSSQLSERVER']"
+                $instance = $wmi.GetSmoObject($uri)
+
+                if (-not ($instance.ServerStartupOptions -contains "-T1800")) {
+                    $instance.ServerStartupOptions += "-T1800"
+                }
+                if (-not ($instance.ServerStartupOptions -contains "-T9567")) {
+                    $instance.ServerStartupOptions += "-T9567"
+                }
+
+                $instance.Alter()
+                Write-Verbose "Trace flags added. SQL Server service restart required."
+            }
+        }
+
         # Restart SQL Server service
         Script RestartSqlAfterConfig {
-            DependsOn = '[Script]ConfigureSqlDefaults','[Script]EnableSqlTcp'
-            GetScript  = { @{ Result = "RestartNeeded" } }
+            DependsOn = '[Script]ConfigureSqlDefaults','[Script]EnableSqlTcp','[Script]EnableAlwaysOn', '[Script]EnableAgTraceFlags'
+            GetScript  = { @{ Result = "Restart required" } }
             TestScript = { $false }  # Always run
             SetScript  = {
                 Write-Verbose "Restarting SQL Server service to apply configuration changes..."
@@ -187,7 +241,81 @@ Configuration Main {
             SetScript = {
                 Write-Verbose "Enabling SA account and setting password..."
                 Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "ALTER LOGIN sa ENABLE"
-                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "ALTER LOGIN sa WITH PASSWORD = 'demo!pass123'"
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "ALTER LOGIN sa WITH PASSWORD = '$using:DatabasePassword'"
+                Write-Verbose "SA account enabled with new password."
+            }
+        }
+
+        # Create a master key in the master database
+        Script CreateMasterKey {
+            DependsOn = '[Service]SqlService','[Script]RestartSqlAfterConfig'
+            GetScript = {
+                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT name FROM sys.symmetric_keys WHERE name LIKE '%DatabaseMasterKey%'"
+                @{ Result = $result }
+            }
+
+            TestScript = {
+                $hasMasterKey = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT COUNT(*) AS KeyCount FROM sys.symmetric_keys WHERE name LIKE '%DatabaseMasterKey%'"
+                ($hasMasterKey.KeyCount -gt 0)
+            }
+            SetScript = {
+                Write-Verbose "Creating master key..."
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "CREATE MASTER KEY ENCRYPTION BY PASSWORD = '$using:DatabasePassword'"
+                Write-Verbose "Master key created."
+            }
+        }
+
+        Script DownloadAzureRootCerts {
+            GetScript = {
+                $digicert = Test-Path "C:\certs\DigiCertGlobalRootG2.crt"
+                $mscert   = Test-Path "C:\certs\Microsoft RSA Root Certificate Authority 2017.crt"
+                @{ Result = "DigiCert=$digicert; Microsoft=$mscert" }
+            }
+            TestScript = {
+                (Test-Path "C:\certs\DigiCertGlobalRootG2.crt") -and (Test-Path "C:\certs\Microsoft RSA Root Certificate Authority 2017.crt")
+            }
+            SetScript = {
+                Write-Verbose "Downloading Azure trusted root certificates..."
+                New-Item -ItemType Directory -Path "C:\certs" -Force | Out-Null
+
+                Invoke-WebRequest `
+                    -Uri "https://cacerts.digicert.com/DigiCertGlobalRootG2.crt" `
+                    -OutFile "C:\certs\DigiCertGlobalRootG2.crt"
+
+                Invoke-WebRequest `
+                    -Uri "https://www.microsoft.com/pkiops/certs/Microsoft%20RSA%20Root%20Certificate%20Authority%202017.crt" `
+                    -OutFile "C:\certs\Microsoft RSA Root Certificate Authority 2017.crt"
+
+                Write-Verbose "Certificates downloaded to C:\certs."
+            }
+        }
+
+        Script ImportAzureRootCerts {
+            DependsOn = '[Service]SqlService', '[Script]EnsureAzureRootCerts'
+            GetScript = {
+                $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT name FROM sys.certificates WHERE name IN ('DigiCertPKI','MicrosoftPKI')"
+                @{ Result = $result }
+            }
+            TestScript = {
+                $certs = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT name FROM sys.certificates WHERE name IN ('DigiCertPKI','MicrosoftPKI')"
+                ($certs.Count -eq 2)
+            }
+            SetScript = {
+                Write-Verbose "Importing Azure-trusted root certificates into SQL Server..."
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query @"
+CREATE CERTIFICATE [DigiCertPKI] FROM FILE = 'C:\certs\DigiCertGlobalRootG2.crt';
+DECLARE @CERTID int;
+SELECT @CERTID = CERT_ID('DigiCertPKI');
+EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
+"@
+
+                Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query @"
+CREATE CERTIFICATE [MicrosoftPKI] FROM FILE = 'C:\certs\Microsoft RSA Root Certificate Authority 2017.crt';
+DECLARE @CERTID int;
+SELECT @CERTID = CERT_ID('MicrosoftPKI');
+EXEC sp_certificate_add_issuer @CERTID, N'*.database.windows.net';
+"@
+                Write-Verbose "Certificates imported successfully."
             }
         }
 
@@ -209,12 +337,13 @@ Configuration Main {
                 Write-Verbose "Downloading database backup from $using:DbBackupFileUrl..."
                 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
                 Invoke-WebRequest -Uri $using:DbBackupFileUrl -OutFile $dbDestination -ErrorAction Stop
+                Write-Verbose "Database backup downloaded to $dbDestination."
             }
         }
 
         # Restore ToyStore database
         Script RestoreToyStore {
-            DependsOn = '[Script]DownloadDbBackup'
+            DependsOn = '[Script]DownloadDbBackup', '[Service]SqlService'
             GetScript = {
                 $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
                     SELECT name FROM sys.databases WHERE name = 'ToyStore'"
@@ -247,12 +376,14 @@ Configuration Main {
                     -BackupFile $dbDestination `
                     -RelocateFile $relocateFiles `
                     -ReplaceDatabase -Verbose
+
+                Write-Verbose "ToyStore database restored."
             }
         }
 
         # Restore Customer360 database
         Script RestoreCustomer360 {
-            DependsOn = '[Script]DownloadDbBackup'
+            DependsOn = '[Script]DownloadDbBackup', '[Service]SqlService'
             GetScript = {
                 $dbExists = Invoke-Sqlcmd -ServerInstance Localhost -Database master -Query "
                     SELECT name FROM sys.databases WHERE name = 'Customer360'"
@@ -285,6 +416,8 @@ Configuration Main {
                     -BackupFile $dbDestination `
                     -RelocateFile $relocateFiles `
                     -ReplaceDatabase -Verbose
+
+                Write-Verbose "Customer360 database restored."
             }
         }
 
@@ -311,6 +444,7 @@ Configuration Main {
                 }
                 Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "
                     ALTER SERVER ROLE sysadmin ADD MEMBER [BUILTIN\Administrators]"
+                Write-Verbose "BUILTIN\Administrators added to sysadmin role."
             }
         }
 
@@ -332,6 +466,7 @@ Configuration Main {
                 Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "
                     ALTER DATABASE ToyStore SET RECOVERY FULL"
                 Backup-SqlDatabase -ServerInstance Localhost -Database ToyStore
+                Write-Verbose "ToyStore recovery model set to FULL."
             }
         }
 
@@ -353,6 +488,7 @@ Configuration Main {
                 Write-Verbose "Setting Customer360 recovery model to SIMPLE..."
                 $query = "ALTER DATABASE [Customer360] SET RECOVERY SIMPLE;"
                 Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query $query -ErrorAction Stop
+                Write-Verbose "Customer360 recovery model set to SIMPLE."
             }
         }
 
@@ -383,6 +519,7 @@ Configuration Main {
 
                 $query = "BACKUP DATABASE [ToyStore] TO DISK = N'$backupPath' WITH INIT, FORMAT, NAME = 'ToyStore-FullBackup';"
                 Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query $query -ErrorAction Stop
+                Write-Verbose "Full backup of ToyStore database completed."
             }
         }
 
@@ -441,6 +578,7 @@ Configuration Main {
             SetScript = {
                 Write-Verbose "Setting MSFT_ARC_TEST environment variable..."
                 [System.Environment]::SetEnvironmentVariable("MSFT_ARC_TEST",'true',[System.EnvironmentVariableTarget]::Machine)
+                Write-Verbose "MSFT_ARC_TEST environment variable set."
             }
         }
 
