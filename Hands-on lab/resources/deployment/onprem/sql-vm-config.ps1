@@ -178,7 +178,7 @@ Configuration Main {
         }
 
         Script EnableAgTraceFlags {
-            DependsOn = '[Service]InstallSqlServerModule'
+            DependsOn = '[Script]InstallSqlServerModule'
             GetScript = {
                 Import-Module SqlServer -ErrorAction Stop
                 $smo = 'Microsoft.SqlServer.Management.Smo.'
@@ -291,7 +291,7 @@ Configuration Main {
         }
 
         Script ImportAzureRootCerts {
-            DependsOn = '[Service]SqlService', '[Script]EnsureAzureRootCerts'
+            DependsOn = '[Service]SqlService', '[Script]DownloadAzureRootCerts'
             GetScript = {
                 $result = Invoke-Sqlcmd -ServerInstance Localhost -Database "master" -Query "SELECT name FROM sys.certificates WHERE name IN ('DigiCertPKI','MicrosoftPKI')"
                 @{ Result = $result }
