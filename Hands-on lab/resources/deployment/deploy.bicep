@@ -222,6 +222,30 @@ resource spoke_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetwor
     }
 }
 
+resource spoke_onprem_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
+  parent: spoke_vnet
+  name: 'spoke-onprem'
+  properties: {
+    remoteVirtualNetwork: {
+      id: onprem_vnet.id
+    }
+    allowVirtualNetworkAccess: true
+    allowForwardedTraffic: true
+  }
+}
+
+resource onprem_spoke_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
+  parent: onprem_vnet
+  name: 'onprem-spoke'
+  properties: {
+    remoteVirtualNetwork: {
+      id: spoke_vnet.id
+    }
+    allowVirtualNetworkAccess: true
+    allowForwardedTraffic: true
+  }
+}
+
 /* ****************************
 Azure SQL Managed Instance
 **************************** */
@@ -287,256 +311,12 @@ resource sqlMiRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01
     principalType: 'User'
   }
 }
-/*
-resource sqlmi_private_endpoint 'Microsoft.Network/privateEndpoints@2025-01-01' = {
-  name: '${sqlMiPrefix}-pe'
-  location: location
-  properties: {
-    subnet: {
-      id: onprem_subnet.id
-    }
-    privateLinkServiceConnections: [
-      {
-        name: 'sqlmi-connection'
-        properties: {
-          privateLinkServiceId: sqlMi.id
-          groupIds: [
-            'managedInstance'
-          ]
-          requestMessage: 'Private endpoint connection for SQL MI'
-        }
-      }
-    ]
-  }
-}
-
-resource sqlmi_dns_zone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  name: 'privatelink.database.windows.net'
-  location: 'global'
-}
-
-resource sqlmi_dns_link 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: sqlmi_dns_zone
-  name: '${onPremPrefix}-dnslink'
-  location: 'global'
-  properties: {
-    virtualNetwork: {
-      id: onprem_vnet.id
-    }
-    registrationEnabled: false
-  }
-}
-*/
 
 resource sqlMi_subnet_routetable 'Microsoft.Network/routeTables@2025-01-01'= {
     name: '${sqlMiPrefix}-rt'
     location: location
     properties: {
-        routes: [
-            {
-                name: 'SqlManagement_0'
-                properties: {
-                    addressPrefix: '65.55.188.0/24'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_1'
-                properties: {
-                    addressPrefix: '207.68.190.32/27'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_2'
-                properties: {
-                    addressPrefix: '13.106.78.32/27'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_3'
-                properties: {
-                    addressPrefix: '13.106.174.32/27'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_4'
-                properties: {
-                    addressPrefix: '13.106.4.96/27'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_5'
-                properties: {
-                    addressPrefix: '104.214.108.80/32'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_6'
-                properties: {
-                    addressPrefix: '52.179.184.76/32'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_7'
-                properties: {
-                    addressPrefix: '52.187.116.202/32'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_8'
-                properties: {
-                    addressPrefix: '52.177.202.6/32'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_9'
-                properties: {
-                    addressPrefix: '23.98.55.75/32'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_10'
-                properties: {
-                    addressPrefix: '23.96.178.199/32'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_11'
-                properties: {
-                    addressPrefix: '52.162.107.128/27'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_12'
-                properties: {
-                    addressPrefix: '40.74.254.227/32'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_13'
-                properties: {
-                    addressPrefix: '23.96.185.63/32'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_14'
-                properties: {
-                    addressPrefix: '65.52.59.57/32'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'SqlManagement_15'
-                properties: {
-                    addressPrefix: '168.62.244.242/32'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_subnet-10-2-1-0-24-to-vnetlocal'
-                properties: {
-                    addressPrefix: '10.2.1.0/24'
-                    nextHopType: 'VnetLocal'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-Storage'
-                properties: {
-                    addressPrefix: 'Storage'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-SqlManagement'
-                properties: {
-                    addressPrefix: 'SqlManagement'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-AzureMonitor'
-                properties: {
-                    addressPrefix: 'AzureMonitor'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-CorpNetSaw'
-                properties: {
-                    addressPrefix: 'CorpNetSaw'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-CorpNetPublic'
-                properties: {
-                    addressPrefix: 'CorpNetPublic'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-AzureActiveDirectory'
-                properties: {
-                    addressPrefix: 'AzureActiveDirectory'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-AzureCloud.northcentralus'
-                properties: {
-                    addressPrefix: 'AzureCloud.northcentralus'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-AzureCloud.southcentralus'
-                properties: {
-                    addressPrefix: 'AzureCloud.southcentralus'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-Storage.northcentralus'
-                properties: {
-                    addressPrefix: 'Storage.northcentralus'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-Storage.southcentralus'
-                properties: {
-                    addressPrefix: 'Storage.southcentralus'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-EventHub.northcentralus'
-                properties: {
-                    addressPrefix: 'EventHub.northcentralus'
-                    nextHopType: 'Internet'
-                }
-            }
-            {
-                name: 'Microsoft.Sql-managedInstances_UseOnly_mi-EventHub.southcentralus'
-                properties: {
-                    addressPrefix: 'EventHub.southcentralus'
-                    nextHopType: 'Internet'
-                }
-            }
-        ]
+        disableBgpRoutePropagation: false
     }
 }
 
