@@ -86,16 +86,17 @@ Configuration Main {
         Script InstallSqlServerModule {
             GetScript = {
                 $module = Get-Module -ListAvailable -Name SqlServer
-                @{ Result = $module }
+                @{ Result = if ($module) { "SqlServer available" } else { "SqlServer missing" } }
             }
             TestScript = {
-                $module = Get-Module -ListAvailable -Name SqlServer
-                $null -ne $module
+                (Get-Module -ListAvailable -Name SqlServer) -ne $null
             }
             SetScript = {
                 Write-Verbose "Installing SqlServer PowerShell module..."
-                Install-Module -Name SqlServer -Force -Scope AllUsers
-                Write-Verbose "SqlServer module installed."
+                if (-not (Get-Module -ListAvailable -Name SqlServer)) {
+                    Install-Module -Name SqlServer -Force -Scope AllUsers -AllowClobber
+                }
+                Write-Verbose "SqlServer module installed or already present."
             }
         }
 
