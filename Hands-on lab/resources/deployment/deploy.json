@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "18398653785566744946"
+      "templateHash": "3667681544933502162"
     }
   },
   "parameters": {
@@ -387,7 +387,211 @@
       "name": "[format('{0}-rt', variables('sqlMiPrefix'))]",
       "location": "[variables('location')]",
       "properties": {
-        "disableBgpRoutePropagation": false
+        "routes": [
+          {
+            "name": "SqlManagement_0",
+            "properties": {
+              "addressPrefix": "65.55.188.0/24",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_1",
+            "properties": {
+              "addressPrefix": "207.68.190.32/27",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_2",
+            "properties": {
+              "addressPrefix": "13.106.78.32/27",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_3",
+            "properties": {
+              "addressPrefix": "13.106.174.32/27",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_4",
+            "properties": {
+              "addressPrefix": "13.106.4.96/27",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_5",
+            "properties": {
+              "addressPrefix": "104.214.108.80/32",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_6",
+            "properties": {
+              "addressPrefix": "52.179.184.76/32",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_7",
+            "properties": {
+              "addressPrefix": "52.187.116.202/32",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_8",
+            "properties": {
+              "addressPrefix": "52.177.202.6/32",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_9",
+            "properties": {
+              "addressPrefix": "23.98.55.75/32",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_10",
+            "properties": {
+              "addressPrefix": "23.96.178.199/32",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_11",
+            "properties": {
+              "addressPrefix": "52.162.107.128/27",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_12",
+            "properties": {
+              "addressPrefix": "40.74.254.227/32",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_13",
+            "properties": {
+              "addressPrefix": "23.96.185.63/32",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_14",
+            "properties": {
+              "addressPrefix": "65.52.59.57/32",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "SqlManagement_15",
+            "properties": {
+              "addressPrefix": "168.62.244.242/32",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_subnet-10-2-1-0-24-to-vnetlocal",
+            "properties": {
+              "addressPrefix": "10.2.1.0/24",
+              "nextHopType": "VnetLocal"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-Storage",
+            "properties": {
+              "addressPrefix": "Storage",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-SqlManagement",
+            "properties": {
+              "addressPrefix": "SqlManagement",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-AzureMonitor",
+            "properties": {
+              "addressPrefix": "AzureMonitor",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-CorpNetSaw",
+            "properties": {
+              "addressPrefix": "CorpNetSaw",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-CorpNetPublic",
+            "properties": {
+              "addressPrefix": "CorpNetPublic",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-AzureActiveDirectory",
+            "properties": {
+              "addressPrefix": "AzureActiveDirectory",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-AzureCloud.northcentralus",
+            "properties": {
+              "addressPrefix": "AzureCloud.northcentralus",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-AzureCloud.southcentralus",
+            "properties": {
+              "addressPrefix": "AzureCloud.southcentralus",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-Storage.northcentralus",
+            "properties": {
+              "addressPrefix": "Storage.northcentralus",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-Storage.southcentralus",
+            "properties": {
+              "addressPrefix": "Storage.southcentralus",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-EventHub.northcentralus",
+            "properties": {
+              "addressPrefix": "EventHub.northcentralus",
+              "nextHopType": "Internet"
+            }
+          },
+          {
+            "name": "Microsoft.Sql-managedInstances_UseOnly_mi-EventHub.southcentralus",
+            "properties": {
+              "addressPrefix": "EventHub.southcentralus",
+              "nextHopType": "Internet"
+            }
+          }
+        ]
       }
     },
     {
