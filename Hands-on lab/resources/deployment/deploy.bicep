@@ -222,6 +222,30 @@ resource spoke_hub_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetwor
     }
 }
 
+resource spoke_onprem_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
+  parent: spoke_vnet
+  name: 'spoke-onprem'
+  properties: {
+    remoteVirtualNetwork: {
+      id: onprem_vnet.id
+    }
+    allowVirtualNetworkAccess: true
+    allowForwardedTraffic: true
+  }
+}
+
+resource onprem_spoke_vnet_peering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2025-01-01' = {
+  parent: onprem_vnet
+  name: 'onprem-spoke'
+  properties: {
+    remoteVirtualNetwork: {
+      id: spoke_vnet.id
+    }
+    allowVirtualNetworkAccess: true
+    allowForwardedTraffic: true
+  }
+}
+
 /* ****************************
 Azure SQL Managed Instance
 **************************** */
@@ -287,46 +311,6 @@ resource sqlMiRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01
     principalType: 'User'
   }
 }
-/*
-resource sqlmi_private_endpoint 'Microsoft.Network/privateEndpoints@2025-01-01' = {
-  name: '${sqlMiPrefix}-pe'
-  location: location
-  properties: {
-    subnet: {
-      id: onprem_subnet.id
-    }
-    privateLinkServiceConnections: [
-      {
-        name: 'sqlmi-connection'
-        properties: {
-          privateLinkServiceId: sqlMi.id
-          groupIds: [
-            'managedInstance'
-          ]
-          requestMessage: 'Private endpoint connection for SQL MI'
-        }
-      }
-    ]
-  }
-}
-
-resource sqlmi_dns_zone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  name: 'privatelink.database.windows.net'
-  location: 'global'
-}
-
-resource sqlmi_dns_link 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: sqlmi_dns_zone
-  name: '${onPremPrefix}-dnslink'
-  location: 'global'
-  properties: {
-    virtualNetwork: {
-      id: onprem_vnet.id
-    }
-    registrationEnabled: false
-  }
-}
-*/
 
 resource sqlMi_subnet_routetable 'Microsoft.Network/routeTables@2025-01-01'= {
     name: '${sqlMiPrefix}-rt'

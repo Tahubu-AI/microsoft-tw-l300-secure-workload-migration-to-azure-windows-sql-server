@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "13403912206217585301"
+      "templateHash": "3667681544933502162"
     }
   },
   "parameters": {
@@ -277,6 +277,38 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('hubNamePrefix')))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+      "apiVersion": "2025-01-01",
+      "name": "[format('{0}/{1}', format('{0}-vnet', variables('spokeNamePrefix')), 'spoke-onprem')]",
+      "properties": {
+        "remoteVirtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]"
+        },
+        "allowVirtualNetworkAccess": true,
+        "allowForwardedTraffic": true
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+      "apiVersion": "2025-01-01",
+      "name": "[format('{0}/{1}', format('{0}-vnet', variables('onPremPrefix')), 'onprem-spoke')]",
+      "properties": {
+        "remoteVirtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix')))]"
+        },
+        "allowVirtualNetworkAccess": true,
+        "allowForwardedTraffic": true
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('onPremPrefix')))]",
         "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', variables('spokeNamePrefix')))]"
       ]
     },
